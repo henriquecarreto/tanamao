@@ -20,7 +20,6 @@ export default function RootLayout({
     <html lang="pt-BR">
       <body className={`${inter.className} min-h-screen flex flex-col bg-slate-50 text-slate-900`}>
         <AppProvider>
-          <DemoToolbar />
           {children}
         </AppProvider>
       </body>

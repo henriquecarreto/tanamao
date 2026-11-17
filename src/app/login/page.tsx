@@ -2,65 +2,76 @@
 
 import React, { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import Image from 'next/image';
 import { useApp } from '@/context/AppContext';
 import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   HardHat,
-  ShieldCheck,
-  Building2,
-  User,
   ArrowRight,
-  Sparkles,
   Mail,
   Lock,
   Phone,
+  User,
+  Building2,
   AlertCircle,
   CheckCircle2,
   Loader2,
-  Info,
-  Check,
+  ArrowLeft,
+  Briefcase,
+  MapPin,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
-function LoginFormContent() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const authError = searchParams.get('error');
-  const { switchRole } = useApp();
+  const { setCurrentUser } = useApp();
 
-  const [mode, setMode] = useState<'login' | 'register'>('login');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  // Modos da tela: 'login' | 'register'
+  const [viewMode, setViewMode] = useState<'login' | 'register'>('login');
+  const [accountType, setAccountType] = useState<'customer' | 'provider' | 'store'>('customer');
+
+  // Campos de Login
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+
+  // Campos de Cadastro
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
-  const [selectedRole, setSelectedRole] = useState<'customer' | 'provider' | 'store'>('provider');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  const [specialty, setSpecialty] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [city, setCity] = useState('');
+  const [cep, setCep] = useState('');
 
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState(
-    authError ? 'Falha no link de autenticação. Por favor, entre com seu e-mail e senha.' : ''
+    authError ? 'Falha no link de autenticação. Por favor, entre com suas credenciais.' : ''
   );
   const [successMessage, setSuccessMessage] = useState('');
 
-  // Redirecionamento por perfil
-  const redirectByRole = (role: string) => {
+  // Abre o formulário de cadastro com o tipo de conta já definido
+  const openRegister = (type: 'customer' | 'provider' | 'store') => {
+    setAccountType(type);
+    setViewMode('register');
+    setErrorMessage('');
+    setSuccessMessage('');
+  };
+
+  // Redirecionamento por papel após autenticação
+  const handleAuthRedirect = (role: string) => {
     if (role === 'admin') {
-      switchRole('admin');
       router.push('/admin');
-    } else if (role === 'store') {
-      switchRole('store');
-      router.push('/painel');
-    } else if (role === 'provider') {
-      switchRole('provider');
+    } else if (role === 'provider' || role === 'store') {
       router.push('/painel');
     } else {
-      switchRole('customer');
       router.push('/explorar');
     }
   };
 
-  const handleAuthSubmit = async (e: React.FormEvent) => {
+  // Submissão do Formulário de Login
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setErrorMessage('');
@@ -68,422 +79,501 @@ function LoginFormContent() {
 
     try {
       if (isSupabaseConfigured && supabase) {
-        if (mode === 'login') {
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: loginEmail,
+          password: loginPassword,
+        });
 
-          if (error) throw error;
+        if (error) throw error;
 
-          if (data.user) {
-            const { data: profile } = await supabase
-              .from('profiles')
-              .select('role')
-              .eq('id', data.user.id)
-              .single();
+        if (data.user) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', data.user.id)
+            .single();
 
-            const role = profile?.role || data.user.user_metadata?.role || 'customer';
-            redirectByRole(role);
-          }
-        } else {
-          const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
-          const { data, error } = await supabase.auth.signUp({
-            email,
-            password,
-            options: {
-              data: {
-                role: selectedRole,
-                full_name: fullName,
-                phone_whatsapp: phone,
-              },
-              emailRedirectTo: `${siteUrl}/auth/callback`,
-            },
-          });
+          const role = profile?.role || data.user.user_metadata?.role || 'customer';
+          const userObj = {
+            id: data.user.id,
+            role,
+            fullName: profile?.full_name || data.user.email?.split('@')[0] || 'Usuário',
+            email: data.user.email || loginEmail,
+            phoneWhatsapp: profile?.phone_whatsapp || '',
+            isBlocked: profile?.is_blocked || false,
+            createdAt: profile?.created_at || new Date().toISOString(),
+          };
 
-          if (error) throw error;
-
+          setCurrentUser(userObj);
           try {
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+            localStorage.setItem('tnm_user_v2', JSON.stringify(userObj));
           } catch {}
 
-          if (data.session) {
-            redirectByRole(selectedRole);
-          } else {
-            setSuccessMessage(
-              'Conta criada com sucesso! Verifique seu e-mail para confirmar seu cadastro ou realize o login.'
-            );
-            setMode('login');
-          }
+          handleAuthRedirect(role);
         }
       } else {
-        // Modo Demonstração
-        if (mode === 'login') {
-          if (email.includes('admin')) {
-            redirectByRole('admin');
-          } else if (email.includes('loja') || email.includes('store')) {
-            redirectByRole('store');
-          } else if (email.includes('cliente') || email.includes('customer')) {
-            redirectByRole('customer');
-          } else {
-            redirectByRole('provider');
-          }
-        } else {
-          try {
-            confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-          } catch {}
-          redirectByRole(selectedRole);
+        // Modo local com validação
+        let role: 'customer' | 'provider' | 'store' | 'admin' = 'customer';
+        if (loginEmail.toLowerCase().includes('admin')) {
+          role = 'admin';
+        } else if (loginEmail.toLowerCase().includes('loja') || loginEmail.toLowerCase().includes('empresa')) {
+          role = 'store';
+        } else if (loginEmail.toLowerCase().includes('prestador') || loginEmail.toLowerCase().includes('pedreiro')) {
+          role = 'provider';
         }
+
+        const userObj = {
+          id: `usr-${Date.now()}`,
+          role,
+          fullName: loginEmail.split('@')[0],
+          email: loginEmail,
+          phoneWhatsapp: '',
+          isBlocked: false,
+          createdAt: new Date().toISOString(),
+        };
+
+        setCurrentUser(userObj);
+        try {
+          localStorage.setItem('tnm_user_v2', JSON.stringify(userObj));
+        } catch {}
+
+        handleAuthRedirect(role);
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Ocorreu um erro na autenticação. Verifique os dados digitados.');
+      setErrorMessage(err.message || 'Credenciais inválidas. Verifique seu e-mail e senha.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleQuickLogin = (role: 'admin' | 'provider' | 'store' | 'customer') => {
-    redirectByRole(role);
+  // Submissão do Formulário de Cadastro (Supabase Auth)
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setErrorMessage('');
+    setSuccessMessage('');
+
+    try {
+      const targetRole = accountType;
+      const computedName = targetRole === 'store' ? companyName || fullName : fullName;
+
+      if (isSupabaseConfigured && supabase) {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+        const { data, error } = await supabase.auth.signUp({
+          email: registerEmail,
+          password: registerPassword,
+          options: {
+            data: {
+              role: targetRole,
+              full_name: computedName,
+              phone_whatsapp: phone,
+              city,
+              cep,
+              specialty: targetRole === 'provider' ? specialty : undefined,
+              company_name: targetRole === 'store' ? companyName : undefined,
+            },
+            emailRedirectTo: `${siteUrl}/auth/callback`,
+          },
+        });
+
+        if (error) throw error;
+
+        if (data.session && data.user) {
+          const userObj = {
+            id: data.user.id,
+            role: targetRole,
+            fullName: computedName,
+            email: registerEmail,
+            phoneWhatsapp: phone,
+            isBlocked: false,
+            createdAt: new Date().toISOString(),
+          };
+          setCurrentUser(userObj);
+          try {
+            localStorage.setItem('tnm_user_v2', JSON.stringify(userObj));
+          } catch {}
+          handleAuthRedirect(targetRole);
+        } else {
+          setSuccessMessage(
+            'Cadastro realizado com sucesso! Verifique seu e-mail para confirmação ou faça login.'
+          );
+          setViewMode('login');
+          setLoginEmail(registerEmail);
+        }
+      } else {
+        // Fallback local
+        const userObj = {
+          id: `usr-${Date.now()}`,
+          role: targetRole,
+          fullName: computedName,
+          email: registerEmail,
+          phoneWhatsapp: phone,
+          isBlocked: false,
+          createdAt: new Date().toISOString(),
+        };
+
+        setCurrentUser(userObj);
+        try {
+          localStorage.setItem('tnm_user_v2', JSON.stringify(userObj));
+        } catch {}
+
+        handleAuthRedirect(targetRole);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Ocorreu um erro ao processar o cadastro.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2 bg-slate-50">
-      {/* ========================================================= */}
-      {/* LADO 1: FORMULÁRIO DE LOGIN (COM BOTÃO VERDE) */}
-      {/* ========================================================= */}
-      <div className="flex flex-col justify-between p-6 sm:p-10 lg:p-12 xl:p-16 bg-white shadow-xl lg:shadow-none z-10">
-        {/* Topo: Marca Tá Na Mão */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-slate-900 text-amber-400 flex items-center justify-center font-black shadow-md border border-slate-800">
-              <HardHat className="w-6 h-6 text-amber-400" />
-            </div>
-            <div>
-              <span className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                Tá Na Mão
-                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block animate-pulse"></span>
-              </span>
-              <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">
-                Plataforma de Construção & Reformas
-              </span>
-            </div>
+    <div className="min-h-screen w-full grid grid-cols-1 lg:grid-cols-2 bg-white">
+      {/* ========================================================================= */}
+      {/* LADO ESQUERDO: FORMULÁRIO (Fundo branco, verde-escuro #155C4D nos botões) */}
+      {/* ========================================================================= */}
+      <div className="w-full flex flex-col justify-between p-6 sm:p-12 lg:p-16 xl:p-20 bg-white">
+        {/* Marca Tá na Mão */}
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#155C4D] text-white flex items-center justify-center font-black shadow-sm">
+            <HardHat className="w-5 h-5 text-white" />
           </div>
-
-          <span className="hidden sm:inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-700 text-[11px] font-bold px-3 py-1 rounded-full border border-emerald-200">
-            <Check className="w-3.5 h-3.5 text-emerald-600" />
-            Área Logada
+          <span className="text-2xl font-black text-slate-900 tracking-tight">
+            Tá na Mão
           </span>
         </div>
 
-        {/* Centro: Formulário com o Botão Verde */}
-        <div className="my-auto py-8 max-w-md w-full mx-auto space-y-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              {mode === 'login' ? 'Acesse sua conta' : 'Crie sua conta'}
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-1">
-              {mode === 'login'
-                ? 'Conecte-se para buscar profissionais ou gerenciar seus anúncios.'
-                : 'Cadastre-se para divulgar seus serviços na sua região.'}
-            </p>
-          </div>
+        {/* ===================================================================== */}
+        {/* MODO 1: TELA INICIAL COM LOGIN E SEÇÃO CRIAR CONTA COM 3 BOTÕES       */}
+        {/* ===================================================================== */}
+        {viewMode === 'login' ? (
+          <div className="my-auto py-8 max-w-md w-full mx-auto space-y-6">
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tight">
+                Entre na sua conta
+              </h1>
+            </div>
 
-          {/* Abas Alternar Login / Cadastro */}
-          <div className="flex bg-slate-100 p-1 rounded-2xl text-xs font-bold">
+            {errorMessage && (
+              <div className="bg-red-50 border border-red-200 text-red-800 p-3.5 rounded-xl text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-xl text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
+                <span>{successMessage}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  E-mail
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-[#155C4D] font-medium transition"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Senha
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-3 text-xs focus:outline-none focus:border-[#155C4D] font-medium transition"
+                  />
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#155C4D] hover:bg-[#10473b] active:bg-[#0c382e] text-white font-bold py-3.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Entrando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Entrar</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
+              </button>
+            </form>
+
+            {/* SEÇÃO "Criar conta" COM EXATAMENTE TRÊS BOTÕES: Cliente, Prestador e Empresa */}
+            <div className="pt-6 border-t border-slate-100">
+              <span className="block text-xs font-bold text-slate-500 mb-3 text-center uppercase tracking-wider">
+                Criar conta
+              </span>
+              <div className="grid grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => openRegister('customer')}
+                  className="w-full py-3 px-2 rounded-xl border border-slate-200 hover:border-[#155C4D] hover:bg-slate-50 text-slate-800 hover:text-[#155C4D] font-bold text-xs transition text-center cursor-pointer flex flex-col items-center gap-1 shadow-sm"
+                >
+                  <User className="w-4 h-4 text-[#155C4D]" />
+                  <span>Cliente</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openRegister('provider')}
+                  className="w-full py-3 px-2 rounded-xl border border-slate-200 hover:border-[#155C4D] hover:bg-slate-50 text-slate-800 hover:text-[#155C4D] font-bold text-xs transition text-center cursor-pointer flex flex-col items-center gap-1 shadow-sm"
+                >
+                  <HardHat className="w-4 h-4 text-[#155C4D]" />
+                  <span>Prestador</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => openRegister('store')}
+                  className="w-full py-3 px-2 rounded-xl border border-slate-200 hover:border-[#155C4D] hover:bg-slate-50 text-slate-800 hover:text-[#155C4D] font-bold text-xs transition text-center cursor-pointer flex flex-col items-center gap-1 shadow-sm"
+                >
+                  <Building2 className="w-4 h-4 text-[#155C4D]" />
+                  <span>Empresa</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* =================================================================== */
+          /* MODO 2: FORMULÁRIO DE CADASTRO COM O TIPO DE CONTA JÁ DEFINIDO      */
+          /* =================================================================== */
+          <div className="my-auto py-6 max-w-md w-full mx-auto space-y-5">
             <button
               type="button"
               onClick={() => {
-                setMode('login');
+                setViewMode('login');
                 setErrorMessage('');
               }}
-              className={`flex-1 py-2.5 rounded-xl transition ${
-                mode === 'login'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
+              className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-[#155C4D] transition"
             >
-              Entrar
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Voltar para o login</span>
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setMode('register');
-                setErrorMessage('');
-              }}
-              className={`flex-1 py-2.5 rounded-xl transition ${
-                mode === 'register'
-                  ? 'bg-white text-slate-900 shadow-sm'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              Criar Conta Grátis
-            </button>
-          </div>
 
-          {/* Mensagens de Erro ou Sucesso */}
-          {errorMessage && (
-            <div className="bg-red-50 border border-red-200 text-red-800 p-3.5 rounded-xl text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
-              <span>{errorMessage}</span>
+            <div>
+              <span className="inline-block bg-slate-100 text-[#155C4D] text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-md mb-2">
+                Tipo de Conta:{' '}
+                {accountType === 'customer'
+                  ? 'Cliente'
+                  : accountType === 'provider'
+                  ? 'Prestador'
+                  : 'Empresa'}
+              </span>
+              <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+                {accountType === 'customer'
+                  ? 'Cadastro de Cliente'
+                  : accountType === 'provider'
+                  ? 'Cadastro de Prestador'
+                  : 'Cadastro de Empresa'}
+              </h1>
             </div>
-          )}
 
-          {successMessage && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-xl text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-              <span>{successMessage}</span>
-            </div>
-          )}
+            {errorMessage && (
+              <div className="bg-red-50 border border-red-200 text-red-800 p-3.5 rounded-xl text-xs flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                <span>{errorMessage}</span>
+              </div>
+            )}
 
-          {/* FORMULÁRIO */}
-          <form onSubmit={handleAuthSubmit} className="space-y-4">
-            {mode === 'register' && (
-              <>
+            <form onSubmit={handleRegisterSubmit} className="space-y-3.5">
+              {accountType === 'store' ? (
                 <div>
-                  <label className="block text-[11px] font-bold text-slate-700 uppercase mb-1">
-                    Tipo de Conta
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Nome da Empresa / Razão Social
                   </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('provider')}
-                      className={`p-2.5 rounded-xl text-center border transition text-[11px] font-bold ${
-                        selectedRole === 'provider'
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm ring-1 ring-emerald-500'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <HardHat className="w-4 h-4 mx-auto mb-1 text-emerald-600" />
-                      Prestador
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('store')}
-                      className={`p-2.5 rounded-xl text-center border transition text-[11px] font-bold ${
-                        selectedRole === 'store'
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm ring-1 ring-emerald-500'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <Building2 className="w-4 h-4 mx-auto mb-1 text-slate-700" />
-                      Loja
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setSelectedRole('customer')}
-                      className={`p-2.5 rounded-xl text-center border transition text-[11px] font-bold ${
-                        selectedRole === 'customer'
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-950 shadow-sm ring-1 ring-emerald-500'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <User className="w-4 h-4 mx-auto mb-1 text-blue-600" />
-                      Cliente
-                    </button>
+                  <div className="relative">
+                    <Building2 className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="Ex: Comercial Vale Materiais"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-[#155C4D] font-medium"
+                    />
                   </div>
                 </div>
-
+              ) : (
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                     Nome Completo
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="João da Silva"
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs focus:outline-none focus:border-emerald-500 font-medium"
-                  />
+                  <div className="relative">
+                    <User className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Ex: Carlos Eduardo Silva"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-[#155C4D] font-medium"
+                    />
+                  </div>
                 </div>
+              )}
 
+              {accountType === 'provider' && (
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Especialidade Principal
+                  </label>
+                  <div className="relative">
+                    <Briefcase className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={specialty}
+                      onChange={(e) => setSpecialty(e.target.value)}
+                      placeholder="Ex: Pedreiro, Eletricista, Pintor"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-[#155C4D] font-medium"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
                     WhatsApp (com DDD)
                   </label>
                   <div className="relative">
-                    <Phone className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                    <Phone className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
                     <input
                       type="tel"
                       required
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
                       placeholder="(18) 99765-4321"
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-emerald-500 font-medium"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-[#155C4D] font-medium"
                     />
                   </div>
                 </div>
-              </>
-            )}
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                E-mail
-              </label>
-              <div className="relative">
-                <Mail className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="seuemail@exemplo.com"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-emerald-500 font-medium"
-                />
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Cidade / UF
+                  </label>
+                  <div className="relative">
+                    <MapPin className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                    <input
+                      type="text"
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      placeholder="Ex: Palmital - SP"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-[#155C4D] font-medium"
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                Senha
-              </label>
-              <div className="relative">
-                <Lock className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-9 pr-4 py-2.5 text-xs focus:outline-none focus:border-emerald-500 font-medium"
-                />
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  E-mail
+                </label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <input
+                    type="email"
+                    required
+                    value={registerEmail}
+                    onChange={(e) => setRegisterEmail(e.target.value)}
+                    placeholder="seu@email.com"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-[#155C4D] font-medium"
+                  />
+                </div>
               </div>
-            </div>
 
-            {/* BOTÃO VERDE APROVADO */}
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-black py-3.5 px-4 rounded-xl text-sm transition-all shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Autenticando...</span>
-                </>
-              ) : (
-                <>
-                  <span>{mode === 'login' ? 'Entrar no Sistema' : 'Finalizar Cadastro'}</span>
-                  <ArrowRight className="w-4 h-4" />
-                </>
-              )}
-            </button>
-          </form>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Senha
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400" />
+                  <input
+                    type="password"
+                    required
+                    value={registerPassword}
+                    onChange={(e) => setRegisterPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl pl-10 pr-4 py-2.5 text-xs focus:outline-none focus:border-[#155C4D] font-medium"
+                  />
+                </div>
+              </div>
 
-          {/* ACESSO RÁPIDO PARA DEMO (1 CLIQUE) */}
-          <div className="bg-slate-50 border border-slate-200 p-3.5 rounded-2xl space-y-2">
-            <span className="text-[10px] font-bold text-slate-600 uppercase flex items-center gap-1.5 tracking-wider">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
-              Acesso Rápido para Teste:
-            </span>
-            <div className="grid grid-cols-2 gap-2 text-[11px] font-bold">
               <button
-                type="button"
-                onClick={() => handleQuickLogin('provider')}
-                className="bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 py-2 px-2.5 rounded-xl flex items-center justify-between transition shadow-sm"
+                type="submit"
+                disabled={loading}
+                className="w-full bg-[#155C4D] hover:bg-[#10473b] active:bg-[#0c382e] text-white font-bold py-3.5 px-4 rounded-xl text-sm transition shadow-sm flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                <span className="flex items-center gap-1 truncate">
-                  <HardHat className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  Prestador
-                </span>
-                <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Cadastrando...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Criar Conta</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </button>
+            </form>
 
+            <div className="text-center pt-2">
               <button
                 type="button"
-                onClick={() => handleQuickLogin('store')}
-                className="bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 py-2 px-2.5 rounded-xl flex items-center justify-between transition shadow-sm"
+                onClick={() => setViewMode('login')}
+                className="text-xs font-bold text-slate-500 hover:text-[#155C4D] transition"
               >
-                <span className="flex items-center gap-1 truncate">
-                  <Building2 className="w-3.5 h-3.5 text-slate-700 shrink-0" />
-                  Loja
-                </span>
-                <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('customer')}
-                className="bg-white hover:bg-slate-100 text-slate-800 border border-slate-200 py-2 px-2.5 rounded-xl flex items-center justify-between transition shadow-sm"
-              >
-                <span className="flex items-center gap-1 truncate">
-                  <User className="w-3.5 h-3.5 text-blue-600 shrink-0" />
-                  Cliente
-                </span>
-                <ArrowRight className="w-3 h-3 text-slate-400 shrink-0" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleQuickLogin('admin')}
-                className="bg-slate-900 hover:bg-slate-800 text-amber-400 py-2 px-2.5 rounded-xl flex items-center justify-between transition shadow-sm"
-              >
-                <span className="flex items-center gap-1 truncate">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-                  Admin
-                </span>
-                <ArrowRight className="w-3 h-3 shrink-0" />
+                Já possui uma conta? <span className="underline">Entrar</span>
               </button>
             </div>
           </div>
+        )}
 
-          <div className="border-t border-slate-100 pt-3 text-[11px] text-slate-400 flex items-start gap-1.5 leading-relaxed">
-            <Info className="w-3.5 h-3.5 shrink-0 text-slate-400 mt-0.5" />
-            <span>
-              Clientes são direcionados à busca. Prestadores e lojas vão ao painel de anúncios. O papel de administrador é atribuído diretamente pelo responsável pelo banco a uma conta já cadastrada.
-            </span>
-          </div>
-        </div>
-
-        {/* Rodapé */}
-        <div className="pt-4 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
-          <span>© 2026 Tá Na Mão</span>
-          <span className="text-emerald-700 font-bold">Plataforma Segura</span>
+        {/* Rodapé limpo */}
+        <div className="pt-6 border-t border-slate-100 text-[11px] text-slate-400">
+          <span>© Tá na Mão</span>
         </div>
       </div>
 
-      {/* ========================================================= */}
-      {/* LADO 2: A FOTO (entrada.jpg) COM DESTAQUE INSTITUCIONAL */}
-      {/* ========================================================= */}
-      <div className="hidden lg:relative lg:flex flex-col justify-end p-12 xl:p-16 bg-slate-950 overflow-hidden min-h-screen">
+      {/* ========================================================================= */}
+      {/* LADO DIREITO: FOTO ORIGINAL (public/entrada-construcao.jpg)                */}
+      {/* Exibe APENAS a fotografia, sem faixas, sem selos e sem textos sobrepostos  */}
+      {/* ========================================================================= */}
+      <div className="hidden lg:block relative w-full h-full min-h-screen bg-slate-900">
         <Image
-          src="/entrada.jpg"
-          alt="Construção e Reformas Tá Na Mão"
+          src="/entrada-construcao.jpg"
+          alt="Tá na Mão - Arquitetura e Construção"
           fill
           priority
-          className="object-cover opacity-85"
+          sizes="50vw"
+          className="object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-transparent" />
-
-        <div className="relative z-10 space-y-4 max-w-lg text-white">
-          <div className="inline-flex items-center gap-2 bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 font-bold text-xs uppercase px-3 py-1.5 rounded-full backdrop-blur-md">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Rede Nacional de Construção Civil</span>
-          </div>
-
-          <h2 className="text-3xl xl:text-4xl font-black text-white leading-tight">
-            Conectando profissionais qualificados a quem precisa construir ou reformar.
-          </h2>
-
-          <p className="text-slate-300 text-xs sm:text-sm leading-relaxed">
-            Sem intermediários e sem cobrança de comissões por obra. O cliente encontra seu perfil por geolocalização e fala direto no seu WhatsApp.
-          </p>
-
-          <div className="grid grid-cols-3 gap-3 pt-3">
-            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 text-center">
-              <span className="block text-xl font-black text-amber-400">5.570</span>
-              <span className="text-[10px] text-slate-300 font-semibold uppercase">Municípios</span>
-            </div>
-            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 text-center">
-              <span className="block text-xl font-black text-emerald-400">100%</span>
-              <span className="text-[10px] text-slate-300 font-semibold uppercase">WhatsApp Direto</span>
-            </div>
-            <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl border border-white/10 text-center">
-              <span className="block text-xl font-black text-white">30 Dias</span>
-              <span className="text-[10px] text-slate-300 font-semibold uppercase">Grátis para Testar</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -491,8 +581,8 @@ function LoginFormContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="min-h-screen bg-slate-50 flex items-center justify-center font-bold text-slate-400">Carregando...</div>}>
-      <LoginFormContent />
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center font-bold text-slate-400">Carregando...</div>}>
+      <LoginContent />
     </Suspense>
   );
 }
