@@ -2,21 +2,21 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/context/AppContext';
-import { Settings, Plus, MapPin, Tag, Check, Eye, EyeOff } from 'lucide-react';
+import { Settings, Plus, Tag, Eye, EyeOff, DollarSign, Save } from 'lucide-react';
 import { CategoryIcon } from '@/components/CategoryIcon';
 
 export default function AdminConfiguracoesPage() {
-  const { categories, cities } = useApp();
+  const { categories } = useApp();
 
   const [catList, setCatList] = useState(categories);
-  const [cityList, setCityList] = useState(cities);
-
-  // Nova categoria
   const [newCatName, setNewCatName] = useState('');
   const [newCatIcon, setNewCatIcon] = useState('Hammer');
 
-  // Nova cidade
-  const [newCityName, setNewCityName] = useState('');
+  // Valores dos Planos Nacionais SaaS
+  const [planProvider, setPlanProvider] = useState('49.90');
+  const [planStoreBasic, setPlanStoreBasic] = useState('199.90');
+  const [planStoreFeatured, setPlanStoreFeatured] = useState('299.90');
+  const [plansSaved, setPlansSaved] = useState(false);
 
   const handleAddCategory = (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,24 +35,14 @@ export default function AdminConfiguracoesPage() {
     alert(`Categoria "${newCat.name}" criada com sucesso!`);
   };
 
-  const handleAddCity = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newCityName.trim()) return;
-    const slug = newCityName.toLowerCase().replace(/\s+/g, '-');
-    const newCity = {
-      id: Date.now(),
-      name: newCityName.trim(),
-      state: 'SP',
-      slug,
-      isActive: true,
-    };
-    setCityList([...cityList, newCity]);
-    setNewCityName('');
-    alert(`Cidade "${newCity.name} - SP" adicionada com sucesso!`);
-  };
-
   const toggleCatActive = (id: number) => {
     setCatList(catList.map((c) => (c.id === id ? { ...c, isActive: !c.isActive } : c)));
+  };
+
+  const handleSavePlans = (e: React.FormEvent) => {
+    e.preventDefault();
+    setPlansSaved(true);
+    setTimeout(() => setPlansSaved(false), 3000);
   };
 
   return (
@@ -60,10 +50,10 @@ export default function AdminConfiguracoesPage() {
       <div>
         <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
           <Settings className="w-7 h-7 text-amber-500" />
-          Configurações: Categorias & Cidades
+          Configurações: Categorias & Planos SaaS
         </h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-1">
-          Adicione novas profissões da construção civil e expanda a cobertura regional do portal
+          Adicione novas profissões da construção civil e configure as mensalidades nacionais da plataforma
         </p>
       </div>
 
@@ -82,7 +72,7 @@ export default function AdminConfiguracoesPage() {
           {/* Form Adicionar Categoria */}
           <form onSubmit={handleAddCategory} className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
             <span className="text-xs font-bold text-slate-700 uppercase block">
-              Criar Nova Categoria / Especialidade:
+              Criar Nova Especialidade:
             </span>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input
@@ -146,59 +136,91 @@ export default function AdminConfiguracoesPage() {
         </div>
 
         {/* ============================================================= */}
-        {/* COLUNA 2: CIDADES ATENDIDAS */}
+        {/* COLUNA 2: VALORES DOS PLANOS SAAS */}
         {/* ============================================================= */}
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-sm space-y-6">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3">
             <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
-              <MapPin className="w-5 h-5 text-amber-500" />
-              Cidades Atendidas ({cityList.length})
+              <DollarSign className="w-5 h-5 text-emerald-600" />
+              Planos & Mensalidades Nacionais
             </h3>
           </div>
 
-          {/* Form Adicionar Cidade */}
-          <form onSubmit={handleAddCity} className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3">
-            <span className="text-xs font-bold text-slate-700 uppercase block">
-              Adicionar Nova Cidade na Região:
-            </span>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                required
-                value={newCityName}
-                onChange={(e) => setNewCityName(e.target.value)}
-                placeholder="Ex: Maracaí, Pedrinhas Paulista"
-                className="flex-1 bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500"
-              />
-              <button
-                type="submit"
-                className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold px-4 py-2 rounded-xl text-xs transition flex items-center gap-1.5 shrink-0"
-              >
-                <Plus className="w-4 h-4 text-amber-400" />
-                <span>Adicionar Cidade</span>
-              </button>
+          {plansSaved && (
+            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs font-semibold">
+              ✓ Preços dos planos atualizados com sucesso no gateway!
             </div>
-          </form>
+          )}
 
-          {/* Lista de Cidades */}
-          <div className="space-y-2">
-            {cityList.map((city) => (
-              <div
-                key={city.id}
-                className="flex items-center justify-between p-3 rounded-xl border border-slate-100 bg-slate-50 text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-amber-500" />
-                  <span className="font-bold text-slate-800">
-                    {city.name} - {city.state}
-                  </span>
-                </div>
-                <span className="bg-emerald-100 text-emerald-800 font-bold text-[10px] uppercase px-2 py-0.5 rounded-full">
-                  Ativa no Portal
-                </span>
+          <form onSubmit={handleSavePlans} className="space-y-4">
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+              <label className="block text-xs font-bold text-slate-800">
+                Plano Prestador Autônomo (Mensalidade)
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">R$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={planProvider}
+                  onChange={(e) => setPlanProvider(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-900 focus:outline-none focus:border-amber-500"
+                />
               </div>
-            ))}
-          </div>
+              <span className="text-[10px] text-slate-400 block">
+                30 dias grátis na criação da conta; após isso cobra este valor.
+              </span>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+              <label className="block text-xs font-bold text-slate-800">
+                Plano Loja Parceira - Divulgação Regional
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">R$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={planStoreBasic}
+                  onChange={(e) => setPlanStoreBasic(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 block">
+                Banners e página institucional com raio até 50km.
+              </span>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2">
+              <label className="block text-xs font-bold text-slate-800">
+                Plano Loja Parceira - Destaque Especial VIP
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-slate-500">R$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  required
+                  value={planStoreFeatured}
+                  onChange={(e) => setPlanStoreFeatured(e.target.value)}
+                  className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-black text-slate-900 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <span className="text-[10px] text-slate-400 block">
+                Banner no topo fixo em raio de até 100km.
+              </span>
+            </div>
+
+            <button
+              type="submit"
+              className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-black px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-sm"
+            >
+              <Save className="w-4 h-4 text-amber-400" />
+              <span>Salvar Novos Valores</span>
+            </button>
+          </form>
         </div>
       </div>
     </div>

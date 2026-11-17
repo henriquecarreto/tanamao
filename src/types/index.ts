@@ -1,16 +1,8 @@
 export type UserRole = 'customer' | 'provider' | 'store' | 'admin';
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled';
-export type PaymentMethod = 'pix' | 'credit_card' | 'manual_admin';
-export type PaymentStatus = 'pending' | 'paid' | 'failed';
+export type PaymentMethod = 'pix' | 'credit_card';
+export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
 export type EventType = 'profile_view' | 'whatsapp_click' | 'banner_click';
-
-export interface City {
-  id: number;
-  name: string;
-  state: string;
-  slug: string;
-  isActive: boolean;
-}
 
 export interface Category {
   id: number;
@@ -28,9 +20,27 @@ export interface Profile {
   email: string;
   phoneWhatsapp: string;
   avatarUrl?: string;
-  city: string;
-  state: string;
   isBlocked: boolean;
+  createdAt: string;
+}
+
+export interface PortfolioItem {
+  id: string;
+  providerId: string;
+  title: string;
+  description?: string;
+  imageUrl: string;
+  createdAt: string;
+}
+
+export interface Review {
+  id: string;
+  providerId: string;
+  authorName: string;
+  rating: number; // 1 to 5
+  comment: string;
+  serviceHired?: string;
+  isApproved: boolean;
   createdAt: string;
 }
 
@@ -40,11 +50,17 @@ export interface ProviderProfile {
   fullName: string;
   avatarUrl?: string;
   phoneWhatsapp: string;
-  baseCity: string;
-  state: string;
   bio: string;
   yearsExperience: number;
-  citiesServed: string[];
+  cep: string;
+  street?: string;
+  neighborhood: string;
+  city: string;
+  state: string; // Ex: 'SP'
+  ibgeCode?: string;
+  latitude: number;
+  longitude: number;
+  serviceRadiusKm: number;
   categories: Category[];
   isVerified: boolean;
   subscriptionStatus: SubscriptionStatus;
@@ -60,54 +76,28 @@ export interface ProviderProfile {
   createdAt: string;
 }
 
-export interface PortfolioItem {
-  id: string;
-  providerId: string;
-  title: string;
-  description?: string;
-  imageUrl: string;
-  createdAt: string;
-}
-
-export interface StoreOffer {
-  id: string;
-  storeId: string;
-  productName: string;
-  originalPrice?: number;
-  promotionalPrice: number;
-  imageUrl?: string;
-  validUntil?: string;
-  isActive: boolean;
-  createdAt: string;
-}
-
 export interface StoreProfile {
   id: string;
   userId: string;
   companyName: string;
   cnpj?: string;
+  description: string;
   phoneWhatsapp: string;
-  address: string;
+  cep: string;
+  street?: string;
+  neighborhood?: string;
   city: string;
-  state: string;
+  state: string; // Ex: 'SP'
+  latitude: number;
+  longitude: number;
+  coverageRadiusKm: number;
   bannerUrl: string;
-  citiesTargeted: string[];
+  planTier: 'basic_199_90' | 'featured_299_90';
+  planPrice: number;
   subscriptionStatus: 'active' | 'past_due' | 'canceled';
   currentPeriodEnd?: string;
-  planPrice: number;
   totalBannerClicks: number;
-  offers: StoreOffer[];
-  createdAt: string;
-}
-
-export interface Review {
-  id: string;
-  providerId: string;
-  authorName: string;
-  rating: number; // 1 to 5
-  comment: string;
-  serviceHired?: string;
-  isApproved: boolean;
+  totalWhatsappClicks: number;
   createdAt: string;
 }
 
@@ -115,12 +105,14 @@ export interface SubscriptionPayment {
   id: string;
   userId: string;
   userName: string;
-  planType: 'autonomo_49_90' | 'empresa_249_90';
+  planType: 'provider_49_90' | 'store_basic_199_90' | 'store_featured_299_90';
   amount: number;
   paymentMethod: PaymentMethod;
   status: PaymentStatus;
-  pixQrCode?: string;
+  gatewayTransactionId?: string;
+  pixQrCodeBase64?: string;
   pixCopyPaste?: string;
+  webhookReceivedAt?: string;
   paidAt?: string;
   createdAt: string;
 }
@@ -130,5 +122,6 @@ export interface AnalyticsEvent {
   targetId: string;
   eventType: EventType;
   viewerCity?: string;
+  viewerState?: string;
   createdAt: string;
 }

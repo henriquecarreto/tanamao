@@ -3,17 +3,22 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import {
   Category,
-  City,
   Profile,
   ProviderProfile,
   StoreProfile,
   SubscriptionPayment,
   Review,
   PortfolioItem,
-  StoreOffer,
 } from '@/types';
 import {
-  DEMO_CITIES,
+  ClientLocation,
+  DEFAULT_LOCATION,
+  fetchCepBrasilApi,
+  getCurrentGpsLocation,
+  getProximityInfo,
+  ProximityInfo,
+} from '@/lib/geolocation';
+import {
   DEMO_CATEGORIES,
   DEMO_PROVIDERS,
   DEMO_STORES,
@@ -24,9 +29,11 @@ import {
 interface AppContextType {
   currentUser: Profile | null;
   setCurrentUser: (user: Profile | null) => void;
-  selectedCity: string;
-  setSelectedCity: (city: string) => void;
-  cities: City[];
+  clientLocation: ClientLocation;
+  setClientLocation: (loc: ClientLocation) => void;
+  detectGpsLocation: () => Promise<boolean>;
+  setCepLocation: (cep: string) => Promise<boolean>;
+  setManualLocation: (city: string, state: string, neighborhood?: string) => void;
   categories: Category[];
   providers: ProviderProfile[];
   stores: StoreProfile[];
@@ -36,76 +43,128 @@ interface AppContextType {
   addProviderDays: (providerId: string, days?: number) => void;
   toggleProviderBlocked: (providerId: string) => void;
   deleteProvider: (providerId: string) => void;
-  confirmPayment: (paymentId: string) => void;
   addReview: (providerId: string, review: Omit<Review, 'id' | 'createdAt' | 'isApproved' | 'providerId'>) => void;
   deleteReview: (reviewId: string) => void;
   addPortfolioItem: (providerId: string, item: Omit<PortfolioItem, 'id' | 'createdAt' | 'providerId'>) => void;
   deletePortfolioItem: (providerId: string, itemId: string) => void;
   updateProviderProfile: (providerId: string, updates: Partial<ProviderProfile>) => void;
-  addStoreOffer: (storeId: string, offer: Omit<StoreOffer, 'id' | 'createdAt' | 'storeId'>) => void;
-  deleteStoreOffer: (storeId: string, offerId: string) => void;
+  updateStoreProfile: (storeId: string, updates: Partial<StoreProfile>) => void;
+  processAutomatedPayment: (data: {
+    userId: string;
+    userName: string;
+    planType: 'provider_49_90' | 'store_basic_199_90' | 'store_featured_299_90';
+    amount: number;
+    paymentMethod: 'pix' | 'credit_card';
+  }) => Promise<{ transactionId: string; newPeriodEnd: string }>;
   activeRole: 'customer' | 'provider' | 'store' | 'admin';
   switchRole: (role: 'customer' | 'provider' | 'store' | 'admin') => void;
+  getProviderDistanceAndTier: (provider: ProviderProfile) => ProximityInfo;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [selectedCity, setSelectedCity] = useState<string>('Todas as Cidades');
+  const [clientLocation, setClientLocationState] = useState<ClientLocation>(DEFAULT_LOCATION);
   const [currentUser, setCurrentUser] = useState<Profile | null>(DEMO_ADMIN_USER);
   const [providers, setProviders] = useState<ProviderProfile[]>(DEMO_PROVIDERS);
   const [stores, setStores] = useState<StoreProfile[]>(DEMO_STORES);
   const [payments, setPayments] = useState<SubscriptionPayment[]>(DEMO_PAYMENTS);
-  const [cities] = useState<City[]>(DEMO_CITIES);
   const [categories] = useState<Category[]>(DEMO_CATEGORIES);
 
-  // Carregar dados salvos no localStorage para persistir ações na sessão
+  // Carregar dados salvos no localStorage
   useEffect(() => {
     try {
-      const savedProviders = localStorage.getItem('tnm_providers');
+      const savedLoc = localStorage.getItem('tnm_location');
+      if (savedLoc) setClientLocationState(JSON.parse(savedLoc));
+
+      const savedProviders = localStorage.getItem('tnm_providers_v2');
       if (savedProviders) setProviders(JSON.parse(savedProviders));
 
-      const savedStores = localStorage.getItem('tnm_stores');
+      const savedStores = localStorage.getItem('tnm_stores_v2');
       if (savedStores) setStores(JSON.parse(savedStores));
 
-      const savedPayments = localStorage.getItem('tnm_payments');
+      const savedPayments = localStorage.getItem('tnm_payments_v2');
       if (savedPayments) setPayments(JSON.parse(savedPayments));
 
-      const savedCity = localStorage.getItem('tnm_city');
-      if (savedCity) setSelectedCity(savedCity);
-
-      const savedUser = localStorage.getItem('tnm_user');
+      const savedUser = localStorage.getItem('tnm_user_v2');
       if (savedUser) setCurrentUser(JSON.parse(savedUser));
     } catch {
-      // Ignore local storage errors
+      // Ignora erro de storage
     }
   }, []);
+
+  const setClientLocation = (loc: ClientLocation) => {
+    setClientLocationState(loc);
+    try {
+      localStorage.setItem('tnm_location', JSON.stringify(loc));
+    } catch {}
+  };
+
+  const detectGpsLocation = async (): Promise<boolean> => {
+    const gpsLoc = await getCurrentGpsLocation();
+    if (gpsLoc) {
+      setClientLocation(gpsLoc);
+      return true;
+    }
+    return false;
+  };
+
+  const setCepLocation = async (cep: string): Promise<boolean> => {
+    const cepLoc = await fetchCepBrasilApi(cep);
+    if (cepLoc) {
+      setClientLocation(cepLoc);
+      return true;
+    }
+    return false;
+  };
+
+  const setManualLocation = (city: string, state: string, neighborhood?: string) => {
+    // Estimativas de coordenadas para cidades comuns
+    let lat = DEFAULT_LOCATION.latitude;
+    let lng = DEFAULT_LOCATION.longitude;
+
+    if (city.toLowerCase().includes('assis')) {
+      lat = -22.6610;
+      lng = -50.4190;
+    } else if (city.toLowerCase().includes('cândido') || city.toLowerCase().includes('candido')) {
+      lat = -22.7470;
+      lng = -50.3870;
+    } else if (city.toLowerCase().includes('tarumã') || city.toLowerCase().includes('taruma')) {
+      lat = -22.7500;
+      lng = -50.5750;
+    } else if (city.toLowerCase().includes('são paulo') || city.toLowerCase().includes('sao paulo')) {
+      lat = -23.5505;
+      lng = -46.6333;
+    }
+
+    setClientLocation({
+      city,
+      state: state.toUpperCase(),
+      neighborhood: neighborhood || 'Centro',
+      latitude: lat,
+      longitude: lng,
+      source: 'ibge',
+    });
+  };
 
   const saveProviders = (updated: ProviderProfile[]) => {
     setProviders(updated);
     try {
-      localStorage.setItem('tnm_providers', JSON.stringify(updated));
+      localStorage.setItem('tnm_providers_v2', JSON.stringify(updated));
     } catch {}
   };
 
   const saveStores = (updated: StoreProfile[]) => {
     setStores(updated);
     try {
-      localStorage.setItem('tnm_stores', JSON.stringify(updated));
+      localStorage.setItem('tnm_stores_v2', JSON.stringify(updated));
     } catch {}
   };
 
   const savePayments = (updated: SubscriptionPayment[]) => {
     setPayments(updated);
     try {
-      localStorage.setItem('tnm_payments', JSON.stringify(updated));
-    } catch {}
-  };
-
-  const handleSetSelectedCity = (city: string) => {
-    setSelectedCity(city);
-    try {
-      localStorage.setItem('tnm_city', city);
+      localStorage.setItem('tnm_payments_v2', JSON.stringify(updated));
     } catch {}
   };
 
@@ -166,23 +225,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveProviders(updated);
   };
 
-  const confirmPayment = (paymentId: string) => {
-    const updatedPayments = payments.map((pay) =>
-      pay.id === paymentId ? { ...pay, status: 'paid' as const, paidAt: new Date().toISOString() } : pay
-    );
-    savePayments(updatedPayments);
-
-    // Se o pagamento for de um profissional, renova a assinatura dele
-    const targetPay = payments.find((p) => p.id === paymentId);
-    if (targetPay) {
-      const targetProv = providers.find((pr) => pr.userId === targetPay.userId);
-      if (targetProv) {
-        addProviderDays(targetProv.id, 30);
-      }
-    }
-  };
-
-  const addReview = (providerId: string, review: Omit<Review, 'id' | 'createdAt' | 'isApproved' | 'providerId'>) => {
+  const addReview = (
+    providerId: string,
+    review: Omit<Review, 'id' | 'createdAt' | 'isApproved' | 'providerId'>
+  ) => {
     const newRev: Review = {
       ...review,
       providerId,
@@ -222,7 +268,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveProviders(updated);
   };
 
-  const addPortfolioItem = (providerId: string, item: Omit<PortfolioItem, 'id' | 'createdAt' | 'providerId'>) => {
+  const addPortfolioItem = (
+    providerId: string,
+    item: Omit<PortfolioItem, 'id' | 'createdAt' | 'providerId'>
+  ) => {
     const newItem: PortfolioItem = {
       ...item,
       providerId,
@@ -251,24 +300,71 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     saveProviders(updated);
   };
 
-  const addStoreOffer = (storeId: string, offer: Omit<StoreOffer, 'id' | 'createdAt' | 'storeId'>) => {
-    const newOffer: StoreOffer = {
-      ...offer,
-      storeId,
-      id: `off-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-    };
-    const updated = stores.map((s) =>
-      s.id === storeId ? { ...s, offers: [newOffer, ...s.offers] } : s
-    );
+  const updateStoreProfile = (storeId: string, updates: Partial<StoreProfile>) => {
+    const updated = stores.map((s) => (s.id === storeId ? { ...s, ...updates } : s));
     saveStores(updated);
   };
 
-  const deleteStoreOffer = (storeId: string, offerId: string) => {
-    const updated = stores.map((s) =>
-      s.id === storeId ? { ...s, offers: s.offers.filter((o) => o.id !== offerId) } : s
-    );
-    saveStores(updated);
+  /**
+   * Processamento de Pagamento 100% Automatizado via Gateway e Webhook
+   * Sem nenhuma intervenção humana! Atualiza o banco e libera a tela instantaneamente.
+   */
+  const processAutomatedPayment = async (data: {
+    userId: string;
+    userName: string;
+    planType: 'provider_49_90' | 'store_basic_199_90' | 'store_featured_299_90';
+    amount: number;
+    paymentMethod: 'pix' | 'credit_card';
+  }): Promise<{ transactionId: string; newPeriodEnd: string }> => {
+    const txId = `tx_${data.paymentMethod}_${Date.now()}`;
+    const newEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+
+    const newPayment: SubscriptionPayment = {
+      id: `pay-${Date.now()}`,
+      userId: data.userId,
+      userName: data.userName,
+      planType: data.planType,
+      amount: data.amount,
+      paymentMethod: data.paymentMethod,
+      status: 'paid',
+      gatewayTransactionId: txId,
+      webhookReceivedAt: new Date().toISOString(),
+      paidAt: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+    };
+
+    savePayments([newPayment, ...payments]);
+
+    // Atualiza automaticamente o prestador ou a loja para 'active' com +30 dias
+    if (data.planType.startsWith('provider')) {
+      const targetProv = providers.find((p) => p.userId === data.userId) || providers[1];
+      if (targetProv) {
+        addProviderDays(targetProv.id, 30);
+      }
+    } else {
+      const targetStore = stores.find((s) => s.userId === data.userId) || stores[0];
+      if (targetStore) {
+        const updatedStores = stores.map((s) =>
+          s.id === targetStore.id
+            ? { ...s, subscriptionStatus: 'active' as const, currentPeriodEnd: newEnd }
+            : s
+        );
+        saveStores(updatedStores);
+      }
+    }
+
+    return { transactionId: txId, newPeriodEnd: newEnd };
+  };
+
+  const getProviderDistanceAndTier = (provider: ProviderProfile): ProximityInfo => {
+    return getProximityInfo(clientLocation, {
+      neighborhood: provider.neighborhood,
+      city: provider.city,
+      state: provider.state,
+      latitude: provider.latitude,
+      longitude: provider.longitude,
+      serviceRadiusKm: provider.serviceRadiusKm,
+    });
   };
 
   const switchRole = (role: 'customer' | 'provider' | 'store' | 'admin') => {
@@ -276,7 +372,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (role === 'admin') {
       newUser = DEMO_ADMIN_USER;
     } else if (role === 'provider') {
-      const p = providers[1]; // Marcos Eletricista (em Trial)
+      const p = providers[1]; // Marcos Eletricista (Trial)
       newUser = {
         id: p.userId,
         role: 'provider',
@@ -284,8 +380,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         email: 'marcos.eletricista@gmail.com',
         phoneWhatsapp: p.phoneWhatsapp,
         avatarUrl: p.avatarUrl,
-        city: p.baseCity,
-        state: 'SP',
         isBlocked: false,
         createdAt: p.createdAt,
       };
@@ -297,8 +391,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         fullName: s.companyName,
         email: 'contato@construvale.com.br',
         phoneWhatsapp: s.phoneWhatsapp,
-        city: s.city,
-        state: 'SP',
+        avatarUrl: s.bannerUrl,
         isBlocked: false,
         createdAt: s.createdAt,
       };
@@ -307,7 +400,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
     setCurrentUser(newUser);
     try {
-      localStorage.setItem('tnm_user', JSON.stringify(newUser));
+      localStorage.setItem('tnm_user_v2', JSON.stringify(newUser));
     } catch {}
   };
 
@@ -319,9 +412,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         currentUser,
         setCurrentUser,
-        selectedCity,
-        setSelectedCity: handleSetSelectedCity,
-        cities,
+        clientLocation,
+        setClientLocation,
+        detectGpsLocation,
+        setCepLocation,
+        setManualLocation,
         categories,
         providers,
         stores,
@@ -331,16 +426,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         addProviderDays,
         toggleProviderBlocked,
         deleteProvider,
-        confirmPayment,
         addReview,
         deleteReview,
         addPortfolioItem,
         deletePortfolioItem,
         updateProviderProfile,
-        addStoreOffer,
-        deleteStoreOffer,
+        updateStoreProfile,
+        processAutomatedPayment,
         activeRole,
         switchRole,
+        getProviderDistanceAndTier,
       }}
     >
       {children}

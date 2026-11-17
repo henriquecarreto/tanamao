@@ -1,57 +1,53 @@
-# Plano de Desenvolvimento — Sistema "Tá Na Mão"
-> Portal Regional de Serviços da Construção Civil, Reformas e Lojas de Materiais
-> Região: Palmital, Assis, Tarumã e Cândido Mota (SP)
+# Plano de Refatoração e Consolidação — Plataforma Nacional "Tá Na Mão"
+> SaaS Automatizado em Escala Nacional (Brasil) com Busca Geolocalizada (GPS / CEP BrasilAPI / IBGE)
+> Modelo de Cascata: Rua/Bairro (<= 2 km) -> Cidade (2-15 km) -> Região (> 15 km)
 
 ---
 
-## Status Geral do Projeto: ✅ 100% Concluído e Validado
+## Status Geral: ✅ 100% Concluído e Validado (0 Erros)
 
-- [x] **Etapa 1: Arquitetura Inicial e Setup do Projeto**
-  - [x] 1.1 Criar a estrutura Next.js 14+ (App Router) com TypeScript e Tailwind CSS
-  - [x] 1.2 Configurar paleta de cores corporativa da Construção Civil (#F59E0B Âmbar, #0F172A Azul Escuro, #16A34A WhatsApp, #F8FAFC Fundo)
-  - [x] 1.3 Configurar Lucide Icons e biblioteca de utilitários de componentes
-  - [x] 1.4 Configurar cliente do Supabase com fallback automático para modo demonstração
+- [x] **Etapa 1: Reestruturação do Banco de Dados e PostGIS**
+  - [x] 1.1 Criar migração SQL definitiva `supabase/migrations/001_complete_national_schema.sql`
+  - [x] 1.2 Habilitar extensão PostGIS e triggers de sincronização de ponto espacial (`geography(Point, 4326)`)
+  - [x] 1.3 Criar RPC `search_providers_cascade` com ordenação por proximity_tier (1: Bairro <= 2km, 2: Cidade <= 15km, 3: Região)
+  - [x] 1.4 Remover definitivamente tabelas e colunas de produtos/ofertas (`store_offers`), consolidando lojas como anunciantes institucionais
+  - [x] 1.5 Estruturar tabela de pagamentos com rastreamento de Webhook e gateway automático
 
-- [x] **Etapa 2: Banco de Dados Supabase (SQL Migration & Seed)**
-  - [x] 2.1 Criar `supabase/migrations/001_initial_schema.sql` com as 11 tabelas completas
-  - [x] 2.2 Implementar RLS (Row Level Security) e função de segurança `is_admin()`
-  - [x] 2.3 Criar a View `public_active_providers` com a trava automática de inadimplência/trial
-  - [x] 2.4 Criar Triggers para atualização automática de `rating_avg` e `reviews_count`
-  - [x] 2.5 Criar Função RPC `register_click_event` para contabilização de cliques no WhatsApp e views anônimas
-  - [x] 2.6 Criar Seed data regional completo (Cidades: Palmital, Assis, Tarumã, Cândido Mota; Categorias da construção; Prestadores autônomos; Lojas parceiras; Avaliações e Usuário Admin)
+- [x] **Etapa 2: Serviço de Geolocalização Nacional (GPS, BrasilAPI v2, IBGE)**
+  - [x] 2.1 Criar `src/lib/geolocation.ts` com cálculo Haversine de distância em km
+  - [x] 2.2 Integrar `BrasilAPI v2` (`/api/cep/v2/{cep}`) para captura automática de Rua, Bairro, Cidade, UF e Lat/Lng
+  - [x] 2.3 Integrar API do IBGE (`/api/v1/localidades/estados` e `/municipios`) para seleção nacional completa
+  - [x] 2.4 Integrar `navigator.geolocation` com Reverse Geocoding automático
+  - [x] 2.5 Criar classificador em cascata: Tier 1 (Hiperlocal <= 2km), Tier 2 (Municipal <= 15km), Tier 3 (Regional dentro do raio do prestador)
 
-- [x] **Etapa 3: Camada de Dados, Tipos TypeScript e Modo Demonstração (Mock Store)**
-  - [x] 3.1 Criar definições de tipos TypeScript unificados (`src/types/index.ts`)
-  - [x] 3.2 Criar repositório com dados de demonstração completos (`src/lib/demo-data.ts`)
-  - [x] 3.3 Implementar camada de serviço e estado reativo persistente (`src/context/AppContext.tsx`)
-  - [x] 3.4 Implementar barra de demonstração/seletor de perfil rápido (`src/components/DemoToolbar.tsx`)
+- [x] **Etapa 3: Tipos TypeScript e Dados Demonstrativos Nacionais**
+  - [x] 3.1 Atualizar `src/types/index.ts` removendo `StoreOffer` e adicionando coordenadas, CEP, bairros, raio em km e tiers
+  - [x] 3.2 Atualizar `src/lib/demo-data.ts` com prestadores em diferentes ruas, bairros, cidades e estados com coordenadas reais para validação visual dos 3 níveis de cascata
+  - [x] 3.3 Atualizar lojas parceiras no modelo 100% institucional (sem preços/produtos)
 
-- [x] **Etapa 4: Área Pública e Experiência do Usuário (Frontend)**
-  - [x] 4.1 Navbar moderna com Logo "Tá Na Mão", Seletor de Cidade persistente, Busca e Botão "Anuncie seu Serviço (30 Dias Grátis)"
-  - [x] 4.2 Rodapé institucional completo com cidades atendidas, categorias e suporte
-  - [x] 4.3 Página Inicial (`/`): Hero Section com busca rápida, grade de categorias, banners de lojas, vitrine em destaque e "Como Funciona"
-  - [x] 4.4 Página de Vendas e Captura (`/anuncie`): comparativo Autônomo (R$ 49,90) vs. Loja (R$ 249,90) e ativação imediata dos 30 dias grátis
-  - [x] 4.5 Página de Busca e Catálogo (`/explorar`): filtros combináveis (Cidade, Categoria, Ordenação e Palavra-chave)
-  - [x] 4.6 Página de Perfil do Profissional (`/profissional/[id]`): bio, anos de experiência, galeria de obras, avaliações e botão de WhatsApp com rastreamento
-  - [x] 4.7 Página de Vitrine da Loja de Materiais (`/loja/[id]`): capa, endereço, WhatsApp do balcão e produtos em oferta com preço riscado
+- [x] **Etapa 4: Rotas de API e Webhook Automatizado (Zero Admin Manual)**
+  - [x] 4.1 Criar `src/app/api/checkout/route.ts` para geração de cobrança automatizada Pix (QR Code dinâmico) e Cartão
+  - [x] 4.2 Criar `src/app/api/webhooks/payment/route.ts` para processamento do webhook do gateway e liberação imediata da assinatura
+  - [x] 4.3 Implementar listener em tempo real no cliente com desbloqueio instantâneo da tela
 
-- [x] **Etapa 5: Autenticação & Painel do Assinante (`/painel`)**
-  - [x] 5.1 Telas de Login rápido para teste e acesso ao painel
-  - [x] 5.2 Header do Painel com alerta visual de status da assinatura (contador de dias do Trial)
-  - [x] 5.3 Métricas de Retorno (Cards de Visualizações do Perfil e Cliques no WhatsApp gerados)
-  - [x] 5.4 Formulário completo de edição de perfil
-  - [x] 5.5 Gestão de Portfólio de Obras e Gestão de Ofertas da Loja
-  - [x] 5.6 Módulo "Minha Assinatura / Pagamento": Checkout com Pix Copia e Cola, QR Code e simulação funcional com confete
+- [x] **Etapa 5: Componentes e Interfaces Públicas Geolocalizadas**
+  - [x] 5.1 Criar `src/components/LocationModal.tsx` integrado no Header para troca instantânea de localização (GPS, CEP ou Estado/Cidade)
+  - [x] 5.2 Atualizar `Navbar.tsx` exibindo a localização ativa do cliente (Ex: "📍 Centro, Palmital - SP" ou "📍 Jardins, São Paulo - SP")
+  - [x] 5.3 Atualizar `ProviderCard.tsx` com as badges obrigatórias de proximidade (*"No seu bairro • a X,X km"*, *"Na sua cidade • a X,X km"*, *"Atende sua região • a XX km"*)
+  - [x] 5.4 Refatorar `src/app/page.tsx` com busca por GPS/CEP e exibição em cascata dos 3 níveis
+  - [x] 5.5 Refatorar `src/app/explorar/page.tsx` com filtros de raio em KM (5 km, 15 km, 50 km, etc.) e localização
+  - [x] 5.6 Refatorar Perfil do Prestador (`/profissional/[id]`) exibindo distância exata até o visitante e raio de atendimento
+  - [x] 5.7 Refatorar Página da Loja (`/loja/[id]`) como institucional (rotas no Waze/Google Maps, sem produtos)
+  - [x] 5.8 Atualizar `/anuncie` com planos para Lojas (R$ 199,90 e R$ 299,90) e 30 dias grátis para autônomos
 
-- [x] **Etapa 6: Painel do Administrador Mestre — Backoffice (`/admin`)**
-  - [x] 6.1 Layout exclusivo de Admin com sidebar e proteção de acesso por `role = 'admin'`
-  - [x] 6.2 Dashboard Executivo com KPIs (MRR, Prestadores Ativos, Trial, Inadimplentes, Lojas, Cliques no WhatsApp)
-  - [x] 6.3 Gestão de Profissionais (`/admin/profissionais`): busca, botão "+30 Dias Manualmente", toggle de Selo de Verificado, bloqueio e edição
-  - [x] 6.4 Gestão de Lojas e Banners (`/admin/lojas`): plano de R$ 249,90, ofertas e métricas de cliques por banner
-  - [x] 6.5 Controle Financeiro (`/admin/financeiro`): histórico de cobranças e botão de confirmação manual de Pix
-  - [x] 6.6 Gestão de Categorias e Cidades (`/admin/configuracoes`): adicionar/editar profissões e cidades atendidas
-  - [x] 6.7 Moderação de Avaliações (`/admin/avaliacoes`): exclusão e aprovação de depoimentos
+- [x] **Etapa 6: Painel do Prestador/Loja (`/painel`) e Painel Admin SaaS (`/admin`)**
+  - [x] 6.1 No `/painel`, implementar busca de CEP via BrasilAPI v2 que autopreenche Rua, Bairro, Cidade, UF e coordenadas
+  - [x] 6.2 No `/painel`, implementar Slider de Raio de Atendimento em KM (`service_radius_km`)
+  - [x] 6.3 No `/painel`, implementar Checkout Automatizado com simulação de Webhook e liberação em tempo real na tela
+  - [x] 6.4 No `/admin`, remover qualquer aprovação manual de Pix; implementar Auditoria de Webhooks e Transações Gateway em `/admin/financeiro`
+  - [x] 6.5 Atualizar Dashboard `/admin` com KPIs nacionais (MRR, conversão, leads, inadimplentes)
 
-- [x] **Etapa 7: Validação, Build, Testes e Sincronização**
-  - [x] 7.1 Executar validação de compilação Next.js (`npm run build`) -> Concluído com 0 erros
-  - [x] 7.2 Sincronizar todos os códigos com o repositório GitHub (`git add .`, `commit`, `push origin main`)
+- [x] **Etapa 7: Validação de Compilação, Build e Sincronização GitHub**
+  - [x] 7.1 Executar `npm run build` garantindo zero erros de compilação e tipagem estrita
+  - [x] 7.2 Testar rotas e fluxos
+  - [x] 7.3 Commitar e subir tudo para o GitHub

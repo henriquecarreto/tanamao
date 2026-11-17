@@ -17,18 +17,18 @@ import {
   Camera,
   CheckCircle2,
   Send,
-  Sparkles,
+  Navigation,
 } from 'lucide-react';
 
 export default function ProfissionalDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const { providers, registerClick, addReview } = useApp();
+  const { providers, registerClick, addReview, getProviderDistanceAndTier } = useApp();
 
   const providerId = params?.id as string;
   const provider = providers.find((p) => p.id === providerId);
 
-  // Formulário de nova avaliação
+  // Formulário de avaliação
   const [authorName, setAuthorName] = useState('');
   const [rating, setRating] = useState(5);
   const [serviceHired, setServiceHired] = useState('');
@@ -49,7 +49,7 @@ export default function ProfissionalDetailPage() {
           <div className="bg-white p-8 rounded-2xl border border-slate-200 text-center max-w-md">
             <h2 className="text-xl font-bold text-slate-900 mb-2">Profissional não encontrado</h2>
             <p className="text-xs text-slate-500 mb-6">
-              O perfil procurado pode ter sido pausado ou o link está incorreto.
+              O perfil procurado pode estar em manutenção ou o link está incorreto.
             </p>
             <Link
               href="/explorar"
@@ -65,10 +65,12 @@ export default function ProfissionalDetailPage() {
     );
   }
 
+  const prox = getProviderDistanceAndTier(provider);
+
   const handleWhatsApp = () => {
     registerClick(provider.id, 'whatsapp_click');
     const msg = encodeURIComponent(
-      `Olá ${provider.fullName}! Encontrei seu perfil no Tá Na Mão e gostaria de solicitar um orçamento para um serviço.`
+      `Olá ${provider.fullName}! Encontrei seu perfil no portal Tá Na Mão e gostaria de solicitar um orçamento para uma obra.`
     );
     window.open(`https://wa.me/55${provider.phoneWhatsapp}?text=${msg}`, '_blank');
   };
@@ -97,7 +99,6 @@ export default function ProfissionalDetailPage() {
 
       <main className="flex-1 py-8">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-          {/* Botão de Retorno */}
           <div>
             <button
               onClick={() => router.back()}
@@ -108,12 +109,16 @@ export default function ProfissionalDetailPage() {
             </button>
           </div>
 
-          {/* ============================================================= */}
           {/* CABEÇALHO DO PERFIL */}
-          {/* ============================================================= */}
-          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm">
+          <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm space-y-6">
+            {/* Badge de Proximidade em Destaque */}
+            <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-black tracking-tight bg-emerald-500/10 text-emerald-800 border border-emerald-300">
+              <Navigation className="w-4 h-4 text-emerald-600" />
+              <span>{prox.badgeLabel}</span>
+            </div>
+
             <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-8">
-              {/* Avatar e Dados Principais */}
+              {/* Avatar e Dados */}
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
                 <div className="relative shrink-0">
                   <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl overflow-hidden bg-slate-100 border-4 border-slate-50 shadow-md">
@@ -126,14 +131,14 @@ export default function ProfissionalDetailPage() {
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center font-bold text-slate-400 text-3xl">
+                      <div className="w-full h-full flex items-center justify-center font-black text-slate-400 text-3xl">
                         {provider.fullName.substring(0, 2).toUpperCase()}
                       </div>
                     )}
                   </div>
                   {provider.isVerified && (
                     <div
-                      title="Profissional Verificado pelo Tá Na Mão"
+                      title="Profissional Verificado"
                       className="absolute -bottom-2 -right-2 bg-amber-500 text-slate-950 p-2 rounded-2xl shadow-lg border-2 border-white"
                     >
                       <ShieldCheck className="w-5 h-5 fill-slate-950 text-amber-500" />
@@ -146,27 +151,27 @@ export default function ProfissionalDetailPage() {
                     {provider.categories.map((c) => (
                       <span
                         key={c.id}
-                        className="bg-amber-100 text-amber-900 font-bold text-xs uppercase px-3 py-1 rounded-full border border-amber-200"
+                        className="bg-amber-100 text-amber-900 font-extrabold text-xs uppercase px-3 py-1 rounded-full border border-amber-200"
                       >
                         {c.name}
                       </span>
                     ))}
                     {provider.isVerified && (
-                      <span className="bg-emerald-100 text-emerald-800 font-semibold text-xs px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="bg-emerald-100 text-emerald-800 font-bold text-xs px-2.5 py-0.5 rounded-full flex items-center gap-1">
                         <CheckCircle2 className="w-3.5 h-3.5" />
                         Verificado
                       </span>
                     )}
                   </div>
 
-                  <h1 className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">
+                  <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
                     {provider.fullName}
                   </h1>
 
                   <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-600 flex-wrap">
                     <div className="flex items-center gap-1 text-amber-500">
                       <Star className="w-4 h-4 fill-amber-400 text-amber-400" />
-                      <span className="font-bold text-slate-900">{provider.ratingAvg.toFixed(1)}</span>
+                      <span className="font-extrabold text-slate-900">{provider.ratingAvg.toFixed(1)}</span>
                       <span className="text-slate-400">({provider.reviewsCount} avaliações)</span>
                     </div>
                     <span>•</span>
@@ -176,55 +181,50 @@ export default function ProfissionalDetailPage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 text-xs text-slate-500 pt-1">
+                  <div className="flex items-center gap-1.5 text-xs text-slate-600 pt-1">
                     <MapPin className="w-4 h-4 text-slate-400 shrink-0" />
-                    <span className="font-medium text-slate-700">Sede em {provider.baseCity} - SP</span>
-                    <span>(Atende: {provider.citiesServed.join(', ')})</span>
+                    <span>
+                      {provider.neighborhood}, {provider.city} - {provider.state}
+                    </span>
+                    <span className="text-slate-400 text-[11px]">
+                      • Atende um raio de até <strong>{provider.serviceRadiusKm} km</strong>
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Botão de WhatsApp de Alta Conversão */}
+              {/* Botão de WhatsApp */}
               <div className="w-full md:w-auto shrink-0 flex flex-col items-center gap-2">
                 <button
                   onClick={handleWhatsApp}
-                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-extrabold px-8 py-4 rounded-2xl shadow-xl shadow-emerald-600/20 transition flex items-center justify-center gap-3 text-base"
+                  className="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-black px-8 py-4 rounded-2xl shadow-xl shadow-emerald-600/20 transition flex items-center justify-center gap-3 text-base"
                 >
                   <MessageCircle className="w-6 h-6 fill-white text-emerald-600" />
                   <span>Solicitar Orçamento no WhatsApp</span>
                 </button>
                 <span className="text-[11px] text-slate-400">
-                  ⚡ Resposta direta pelo profissional • Sem taxas
+                  ⚡ Contato direto • Sem comissão por obra
                 </span>
               </div>
             </div>
 
-            {/* Biografia Completa */}
-            <div className="mt-8 pt-8 border-t border-slate-100">
-              <h3 className="font-bold text-sm text-slate-900 uppercase tracking-wider mb-2">
-                Sobre o Profissional
+            {/* Biografia */}
+            <div className="pt-6 border-t border-slate-100">
+              <h3 className="font-bold text-xs uppercase tracking-wider text-slate-500 mb-2">
+                Sobre os Serviços do Profissional
               </h3>
-              <p className="text-slate-700 text-sm sm:text-base leading-relaxed whitespace-pre-line">
+              <p className="text-slate-700 text-xs sm:text-sm leading-relaxed whitespace-pre-line">
                 {provider.bio}
               </p>
             </div>
           </div>
 
-          {/* ============================================================= */}
-          {/* GALERIA DE FOTOS DE OBRAS REALIZADAS (PORTFÓLIO) */}
-          {/* ============================================================= */}
+          {/* GALERIA DE OBRAS REALIZADAS */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                  <Camera className="w-6 h-6 text-amber-500" />
-                  Obras e Reformas Realizadas
-                </h2>
-                <p className="text-xs sm:text-sm text-slate-500">
-                  Registros fotográficos de serviços concluídos por {provider.fullName}
-                </p>
-              </div>
-            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <Camera className="w-6 h-6 text-amber-500" />
+              Fotos de Obras e Reformas Realizadas
+            </h2>
 
             {provider.portfolio.length === 0 ? (
               <div className="p-8 text-center bg-slate-50 rounded-2xl border border-slate-200 text-slate-400 text-xs">
@@ -261,21 +261,13 @@ export default function ProfissionalDetailPage() {
             )}
           </div>
 
-          {/* ============================================================= */}
-          {/* AVALIAÇÕES E DEPOIMENTOS */}
-          {/* ============================================================= */}
+          {/* AVALIAÇÕES */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm space-y-8">
-            <div>
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
-                <Star className="w-6 h-6 text-amber-400 fill-amber-400" />
-                Avaliações de Clientes ({provider.reviewsCount})
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500">
-                Opiniões de quem já contratou e executou obras na região
-              </p>
-            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <Star className="w-6 h-6 text-amber-400 fill-amber-400" />
+              Avaliações de Clientes ({provider.reviewsCount})
+            </h2>
 
-            {/* Lista de Avaliações */}
             <div className="space-y-4">
               {provider.reviews.map((rev) => (
                 <div
@@ -304,19 +296,16 @@ export default function ProfissionalDetailPage() {
               ))}
             </div>
 
-            {/* Formulário para Nova Avaliação */}
+            {/* Formulário para Avaliar */}
             <div className="pt-8 border-t border-slate-100">
               <h3 className="font-bold text-base text-slate-900 mb-2">
                 Já contratou este profissional? Deixe sua avaliação!
               </h3>
-              <p className="text-xs text-slate-500 mb-6">
-                Sua avaliação ajuda outros moradores da região a escolherem com segurança.
-              </p>
 
               {submitted && (
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-xs font-semibold mb-6 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Obrigado! Sua avaliação foi cadastrada com sucesso e já está visível no perfil.</span>
+                  <span>Sua avaliação foi publicada com sucesso!</span>
                 </div>
               )}
 
@@ -331,14 +320,14 @@ export default function ProfissionalDetailPage() {
                       required
                       value={authorName}
                       onChange={(e) => setAuthorName(e.target.value)}
-                      placeholder="Ex: Roberto Silva"
+                      placeholder="Ex: João Ferreira"
                       className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                      Serviço Contratado
+                      Serviço Executado
                     </label>
                     <input
                       type="text"
@@ -386,7 +375,7 @@ export default function ProfissionalDetailPage() {
                     rows={3}
                     value={comment}
                     onChange={(e) => setComment(e.target.value)}
-                    placeholder="Conte como foi o atendimento, pontualidade e qualidade do serviço..."
+                    placeholder="Conte sobre o atendimento, pontualidade e qualidade do serviço..."
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs focus:outline-none focus:border-amber-500"
                   />
                 </div>

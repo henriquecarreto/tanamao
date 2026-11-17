@@ -6,6 +6,7 @@ import Image from 'next/image';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { useApp } from '@/context/AppContext';
+import { fetchCepBrasilApi } from '@/lib/geolocation';
 import {
   HardHat,
   MessageCircle,
@@ -24,61 +25,126 @@ import {
   ShieldCheck,
   Copy,
   Sparkles,
+  MapPin,
+  Crosshair,
+  Compass,
+  Loader2,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
-export default function PainelAssinantePage() {
+export default function PainelPage() {
   const {
     currentUser,
     providers,
     stores,
     updateProviderProfile,
+    updateStoreProfile,
     addPortfolioItem,
     deletePortfolioItem,
-    addProviderDays,
-    addStoreOffer,
-    deleteStoreOffer,
+    processAutomatedPayment,
+    detectGpsLocation,
   } = useApp();
 
-  const [activeTab, setActiveTab] = useState<'overview' | 'profile' | 'portfolio' | 'subscription'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'location' | 'profile' | 'portfolio' | 'subscription'>('overview');
   const [copiedPix, setCopiedPix] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
+  const [simulatingWebhook, setSimulatingWebhook] = useState(false);
 
-  // Prestador logado (ou padrão Marcos Eletricista)
+  // Perfil ativo
   const isStore = currentUser?.role === 'store';
   const currentProvider = providers.find((p) => p.userId === currentUser?.id) || providers[1];
   const currentStore = stores.find((s) => s.userId === currentUser?.id) || stores[0];
 
-  // Formulário de edição do perfil
+  // Edição de Perfil
   const [fullName, setFullName] = useState(currentProvider.fullName);
   const [phone, setPhone] = useState(currentProvider.phoneWhatsapp);
   const [bio, setBio] = useState(currentProvider.bio);
   const [experience, setExperience] = useState(currentProvider.yearsExperience);
   const [profileSaved, setProfileSaved] = useState(false);
 
+  // Edição de Localização e Raio (BrasilAPI v2)
+  const [cep, setCep] = useState(currentProvider.cep || '19970-000');
+  const [street, setStreet] = useState(currentProvider.street || '');
+  const [neighborhood, setNeighborhood] = useState(currentProvider.neighborhood || 'Centro');
+  const [city, setCity] = useState(currentProvider.city || 'Palmital');
+  const [state, setState] = useState(currentProvider.state || 'SP');
+  const [latitude, setLatitude] = useState(currentProvider.latitude || -22.7936);
+  const [longitude, setLongitude] = useState(currentProvider.longitude || -50.2153);
+  const [radiusKm, setRadiusKm] = useState(currentProvider.serviceRadiusKm || 35);
+  const [loadingCep, setLoadingCep] = useState(false);
+  const [locationSaved, setLocationSaved] = useState(false);
+
   // Novo item de portfólio
   const [newPortTitle, setNewPortTitle] = useState('');
   const [newPortDesc, setNewPortDesc] = useState('');
   const [newPortImage, setNewPortImage] = useState(
-    'https://images.unsplash.com/photo-1504307651254-35680f356dfd?auto=format&fit=crop&w=800&q=80'
+    'https://images.unsplash.com/photo-1541888946425-d0fbb186156a?auto=format&fit=crop&w=800&q=80'
   );
 
-  // Nova oferta de loja
-  const [newOfferName, setNewOfferName] = useState('');
-  const [newOfferOrigPrice, setNewOfferOrigPrice] = useState('39.90');
-  const [newOfferPromoPrice, setNewOfferPromoPrice] = useState('29.90');
-  const [newOfferImage, setNewOfferImage] = useState(
-    'https://images.unsplash.com/photo-1589939705384-5185137a7f0f?auto=format&fit=crop&w=500&q=80'
-  );
+  // Busca automática do CEP na BrasilAPI v2
+  const handleCepSearch = async (val: string) => {
+    setCep(val);
+    const clean = val.replace(/\D/g, '');
+    if (clean.length === 8) {
+      setLoadingCep(true);
+      const res = await fetchCepBrasilApi(clean);
+      setLoadingCep(false);
+      if (res) {
+        setStreet(res.street || '');
+        setNeighborhood(res.neighborhood || '');
+        setCity(res.city || '');
+        setState(res.state || 'SP');
+        setLatitude(res.latitude);
+        setLongitude(res.longitude);
+      }
+    }
+  };
+
+  const handleSaveLocation = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isStore) {
+      updateStoreProfile(currentStore.id, {
+        cep,
+        street,
+        neighborhood,
+        city,
+        state,
+        latitude,
+        longitude,
+        coverageRadiusKm: radiusKm,
+      });
+    } else {
+      updateProviderProfile(currentProvider.id, {
+        cep,
+        street,
+        neighborhood,
+        city,
+        state,
+        latitude,
+        longitude,
+        serviceRadiusKm: radiusKm,
+      });
+    }
+    setLocationSaved(true);
+    setTimeout(() => setLocationSaved(false), 3000);
+  };
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
-    updateProviderProfile(currentProvider.id, {
-      fullName,
-      phoneWhatsapp: phone,
-      bio,
-      yearsExperience: Number(experience),
-    });
+    if (isStore) {
+      updateStoreProfile(currentStore.id, {
+        companyName: fullName,
+        phoneWhatsapp: phone,
+        description: bio,
+      });
+    } else {
+      updateProviderProfile(currentProvider.id, {
+        fullName,
+        phoneWhatsapp: phone,
+        bio,
+        yearsExperience: Number(experience),
+      });
+    }
     setProfileSaved(true);
     setTimeout(() => setProfileSaved(false), 3000);
   };
@@ -95,35 +161,62 @@ export default function PainelAssinantePage() {
     setNewPortDesc('');
   };
 
-  const handleAddOffer = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newOfferName.trim()) return;
-    addStoreOffer(currentStore.id, {
-      productName: newOfferName.trim(),
-      originalPrice: Number(newOfferOrigPrice) || undefined,
-      promotionalPrice: Number(newOfferPromoPrice) || 29.9,
-      imageUrl: newOfferImage,
-      isActive: true,
-      validUntil: '2026-12-31',
-    });
-    setNewOfferName('');
-  };
+  // Simulação de Pagamento Automatizado (Post na rota de Webhook)
+  const handleTriggerWebhookPayment = async () => {
+    setSimulatingWebhook(true);
 
-  const handleSimulatePayment = () => {
-    addProviderDays(currentProvider.id, 30);
-    setPaymentSuccess(true);
     try {
-      confetti({
-        particleCount: 120,
-        spread: 80,
-        origin: { y: 0.6 },
+      // 1. Chama a rota de checkout para gerar a transação
+      const checkRes = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          planType: isStore ? 'store_basic_199_90' : 'provider_49_90',
+          paymentMethod: 'pix',
+          userId: isStore ? currentStore.userId : currentProvider.userId,
+        }),
       });
-    } catch {}
-    setTimeout(() => setPaymentSuccess(false), 5000);
+      const checkData = await checkRes.json();
+
+      // 2. Dispara a notificação de Webhook do gateway (liberação 100% automatizada)
+      const hookRes = await fetch('/api/webhooks/payment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          transactionId: checkData.transactionId,
+          status: 'paid',
+          userId: isStore ? currentStore.userId : currentProvider.userId,
+          planType: isStore ? 'store_basic_199_90' : 'provider_49_90',
+        }),
+      });
+      const hookData = await hookRes.json();
+
+      // 3. Atualiza o estado em memória local instantaneamente (Zero Intervenção Manual)
+      await processAutomatedPayment({
+        userId: isStore ? currentStore.userId : currentProvider.userId,
+        userName: isStore ? currentStore.companyName : currentProvider.fullName,
+        planType: isStore ? 'store_basic_199_90' : 'provider_49_90',
+        amount: isStore ? 199.90 : 49.90,
+        paymentMethod: 'pix',
+      });
+
+      setPaymentSuccess(true);
+      try {
+        confetti({
+          particleCount: 130,
+          spread: 80,
+          origin: { y: 0.6 },
+        });
+      } catch {}
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setSimulatingWebhook(false);
+    }
   };
 
   const pixKey =
-    '00020126580014br.gov.bcb.pix0136d8923a41-2c0b-4876-9c48-tanamao520400005303986540549.905802BR5920TA NA MAO SERVICOS6008PALMITAL62070503***6304E8A1';
+    '00020126580014br.gov.bcb.pix0136d8923a41-2c0b-4876-9c48-tanamaonacional52040000530398654049.905802BR5920TA NA MAO SERVICOS6008BRASIL62070503***6304E8A1';
 
   const copyPix = () => {
     navigator.clipboard.writeText(pixKey);
@@ -140,7 +233,7 @@ export default function PainelAssinantePage() {
           {/* HEADER DO PAINEL */}
           <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-2xl bg-slate-900 text-amber-400 flex items-center justify-center font-bold text-xl overflow-hidden shrink-0 border border-slate-700">
+              <div className="w-16 h-16 rounded-2xl bg-slate-900 text-amber-400 flex items-center justify-center font-black text-xl overflow-hidden shrink-0 border border-slate-700">
                 {currentProvider.avatarUrl ? (
                   <Image
                     src={currentProvider.avatarUrl}
@@ -167,15 +260,15 @@ export default function PainelAssinantePage() {
                 </div>
                 <p className="text-xs text-slate-500">
                   {isStore
-                    ? `Painel Corporativo B2B • ${currentStore.city} - SP`
-                    : `Painel do Profissional • ${currentProvider.baseCity} - SP`}
+                    ? `Painel da Loja Anunciante • ${currentStore.city} - ${currentStore.state}`
+                    : `Painel do Prestador • ${currentProvider.neighborhood}, ${currentProvider.city} - ${currentProvider.state}`}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <Link
-                href={`/profissional/${currentProvider.id}`}
+                href={isStore ? `/loja/${currentStore.id}` : `/profissional/${currentProvider.id}`}
                 className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-4 py-2 rounded-xl text-xs transition"
               >
                 Ver Meu Perfil Público &rarr;
@@ -183,7 +276,7 @@ export default function PainelAssinantePage() {
             </div>
           </div>
 
-          {/* ALERTA DE STATUS DA ASSINATURA (TRAVA & TRIAL) */}
+          {/* ALERTA DE STATUS DA ASSINATURA EM TEMPO REAL */}
           <div
             className={`p-5 rounded-2xl border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
               currentProvider.subscriptionStatus === 'trialing'
@@ -203,15 +296,15 @@ export default function PainelAssinantePage() {
               )}
 
               <div>
-                <h4 className="font-bold text-sm">
+                <h4 className="font-black text-sm">
                   {currentProvider.subscriptionStatus === 'trialing'
-                    ? 'Você está no período de 30 Dias Grátis!'
-                    : 'Assinatura Mensal Ativa!'}
+                    ? 'Status da Conta: 30 Dias Grátis Ativos'
+                    : 'Status da Conta: Assinatura Mensal Ativa'}
                 </h4>
                 <p className="text-xs opacity-80 mt-0.5">
                   {currentProvider.subscriptionStatus === 'trialing'
-                    ? 'Restam 23 dias de teste gratuito. Seu perfil está ativo e visível nas buscas de toda a região.'
-                    : `Seu plano está renovado e garantido até ${
+                    ? 'Seu perfil está visível no topo das buscas geolocalizadas na sua cidade e região.'
+                    : `Sua assinatura está renovada automaticamente até ${
                         currentProvider.currentPeriodEnd
                           ? new Date(currentProvider.currentPeriodEnd).toLocaleDateString('pt-BR')
                           : 'Próximo mês'
@@ -225,11 +318,11 @@ export default function PainelAssinantePage() {
               className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold px-4 py-2 rounded-xl text-xs transition shrink-0 flex items-center gap-1.5 shadow-sm"
             >
               <CreditCard className="w-4 h-4" />
-              <span>Gerenciar Assinatura (R$ 49,90)</span>
+              <span>Checkout Automatizado Pix / Cartão</span>
             </button>
           </div>
 
-          {/* TABS DE NAVEGAÇÃO DO PAINEL */}
+          {/* TABS DE NAVEGAÇÃO */}
           <div className="flex items-center gap-2 border-b border-slate-200 pb-2 overflow-x-auto text-xs font-bold">
             <button
               onClick={() => setActiveTab('overview')}
@@ -242,6 +335,17 @@ export default function PainelAssinantePage() {
               Visão Geral & Métricas
             </button>
             <button
+              onClick={() => setActiveTab('location')}
+              className={`px-4 py-2 rounded-xl transition flex items-center gap-1.5 ${
+                activeTab === 'location'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5 text-amber-400" />
+              <span>Localização & Raio em KM</span>
+            </button>
+            <button
               onClick={() => setActiveTab('profile')}
               className={`px-4 py-2 rounded-xl transition ${
                 activeTab === 'profile'
@@ -249,18 +353,20 @@ export default function PainelAssinantePage() {
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              Editar Meus Dados
+              Editar Cadastro
             </button>
-            <button
-              onClick={() => setActiveTab('portfolio')}
-              className={`px-4 py-2 rounded-xl transition ${
-                activeTab === 'portfolio'
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'text-slate-600 hover:bg-slate-100'
-              }`}
-            >
-              {isStore ? 'Gerenciar Ofertas da Loja' : 'Portfólio de Obras'}
-            </button>
+            {!isStore && (
+              <button
+                onClick={() => setActiveTab('portfolio')}
+                className={`px-4 py-2 rounded-xl transition ${
+                  activeTab === 'portfolio'
+                    ? 'bg-slate-900 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Portfólio de Obras
+              </button>
+            )}
             <button
               onClick={() => setActiveTab('subscription')}
               className={`px-4 py-2 rounded-xl transition ${
@@ -269,17 +375,16 @@ export default function PainelAssinantePage() {
                   : 'text-slate-600 hover:bg-slate-100'
               }`}
             >
-              Minha Assinatura / Pagamento Pix
+              Assinatura & Webhook
             </button>
           </div>
 
           {/* ============================================================= */}
-          {/* ABA 1: VISÃO GERAL & MÉTRICAS (PROVA DE VALOR) */}
+          {/* TAB 1: VISÃO GERAL */}
           {/* ============================================================= */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Card WhatsApp Clicks */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
                   <div className="flex items-center justify-between text-emerald-600">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -293,11 +398,10 @@ export default function PainelAssinantePage() {
                     {currentProvider.totalWhatsappClicks}
                   </div>
                   <span className="text-[11px] text-emerald-700 font-semibold block">
-                    +14 contatos nesta semana
+                    Contatos diretos de clientes
                   </span>
                 </div>
 
-                {/* Card Profile Views */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
                   <div className="flex items-center justify-between text-blue-600">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -311,15 +415,14 @@ export default function PainelAssinantePage() {
                     {currentProvider.totalViews}
                   </div>
                   <span className="text-[11px] text-slate-400 block">
-                    Visitantes de Palmital e região
+                    Visitantes na sua região
                   </span>
                 </div>
 
-                {/* Card Avaliação */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
                   <div className="flex items-center justify-between text-amber-500">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Nota Média
+                      Avaliação Média
                     </span>
                     <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center">
                       <Star className="w-5 h-5 text-amber-500 fill-amber-500" />
@@ -329,70 +432,202 @@ export default function PainelAssinantePage() {
                     {currentProvider.ratingAvg.toFixed(1)} ★
                   </div>
                   <span className="text-[11px] text-slate-400 block">
-                    {currentProvider.reviewsCount} avaliações de clientes
+                    {currentProvider.reviewsCount} depoimentos recebidos
                   </span>
                 </div>
 
-                {/* Card Status do Plano */}
                 <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-2">
                   <div className="flex items-center justify-between text-slate-900">
                     <span className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                      Plano Atual
+                      Raio de Atendimento
                     </span>
                     <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center">
-                      <HardHat className="w-5 h-5 text-slate-700" />
+                      <Compass className="w-5 h-5 text-slate-700" />
                     </div>
                   </div>
-                  <div className="text-xl font-black text-slate-900">
-                    {currentProvider.subscriptionStatus === 'trialing' ? '30 Dias Grátis' : 'Ativo'}
+                  <div className="text-2xl font-black text-slate-900">
+                    {currentProvider.serviceRadiusKm} km
                   </div>
                   <span className="text-[11px] text-amber-600 font-semibold block">
-                    R$ 49,90/mês
+                    A partir de {currentProvider.city}
                   </span>
                 </div>
-              </div>
-
-              {/* Dica de conversão */}
-              <div className="bg-gradient-to-r from-slate-900 to-slate-950 text-white p-6 rounded-2xl border border-slate-800 flex flex-col md:flex-row items-center justify-between gap-4">
-                <div className="space-y-1">
-                  <h4 className="font-bold text-sm text-amber-400 flex items-center gap-1.5">
-                    <Sparkles className="w-4 h-4" />
-                    Dica de Ouro para Aumentar seus Serviços:
-                  </h4>
-                  <p className="text-xs text-slate-300">
-                    Profissionais com pelo menos <strong>3 fotos de obras</strong> no portfólio recebem <strong>4x mais chamadas no WhatsApp</strong>.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setActiveTab('portfolio')}
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-4 py-2 rounded-xl text-xs transition shrink-0"
-                >
-                  Adicionar Fotos Agora
-                </button>
               </div>
             </div>
           )}
 
           {/* ============================================================= */}
-          {/* ABA 2: EDITAR DADOS DO PERFIL */}
+          {/* TAB 2: CONFIGURAÇÃO DE LOCALIZAÇÃO & RAIO EM KM (BRASILAPI V2) */}
+          {/* ============================================================= */}
+          {activeTab === 'location' && (
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 flex items-center gap-2">
+                  <MapPin className="w-5 h-5 text-amber-500" />
+                  Configurar Endereço, GPS e Raio de Atendimento
+                </h3>
+                <p className="text-xs text-slate-500">
+                  O sistema usa seu CEP para obter coordenadas exatas via BrasilAPI v2 e calcular a distância até os clientes
+                </p>
+              </div>
+
+              {locationSaved && (
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-xs font-semibold flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <span>Localização e raio de atendimento atualizados com sucesso!</span>
+                </div>
+              )}
+
+              <form onSubmit={handleSaveLocation} className="space-y-5 max-w-2xl">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    CEP da sua Base / Oficina / Residência *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      required
+                      value={cep}
+                      onChange={(e) => handleCepSearch(e.target.value)}
+                      placeholder="Ex: 19970-000"
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-bold focus:outline-none focus:border-amber-500 font-mono"
+                    />
+                    {loadingCep && (
+                      <Loader2 className="w-4 h-4 animate-spin text-amber-600 absolute right-3 top-1/2 -translate-y-1/2" />
+                    )}
+                  </div>
+                  <span className="text-[10px] text-slate-400 mt-1 block">
+                    ⚡ Digite os 8 números: autopreenche Rua, Bairro, Cidade, Estado e Latitude/Longitude.
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Logradouro / Rua
+                    </label>
+                    <input
+                      type="text"
+                      value={street}
+                      onChange={(e) => setStreet(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Bairro *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={neighborhood}
+                      onChange={(e) => setNeighborhood(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 font-bold"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Cidade *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={city}
+                      onChange={(e) => setCity(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 font-bold"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      Estado (UF) *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      maxLength={2}
+                      value={state}
+                      onChange={(e) => setState(e.target.value.toUpperCase())}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500 font-bold uppercase"
+                    />
+                  </div>
+                </div>
+
+                {/* Coordenadas */}
+                <div className="bg-slate-100 p-4 rounded-2xl border border-slate-200 grid grid-cols-2 gap-3 text-xs">
+                  <div>
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">
+                      Latitude GPS
+                    </span>
+                    <span className="font-mono text-slate-800 font-bold">{latitude.toFixed(4)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-500 uppercase font-bold block">
+                      Longitude GPS
+                    </span>
+                    <span className="font-mono text-slate-800 font-bold">{longitude.toFixed(4)}</span>
+                  </div>
+                </div>
+
+                {/* SLIDER DE RAIO EM KM */}
+                <div className="bg-amber-50/70 p-5 rounded-2xl border border-amber-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-xs font-black text-amber-950 uppercase">
+                      Raio Máximo de Atendimento para Obras
+                    </label>
+                    <span className="text-sm font-black text-amber-700 bg-amber-100 px-3 py-1 rounded-xl border border-amber-300">
+                      {radiusKm} km
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min="5"
+                    max="100"
+                    step="5"
+                    value={radiusKm}
+                    onChange={(e) => setRadiusKm(Number(e.target.value))}
+                    className="w-full accent-amber-600 cursor-pointer"
+                  />
+                  <p className="text-[11px] text-slate-600">
+                    Você aparecerá para clientes localizados a até <strong>{radiusKm} km</strong> do seu endereço (incluindo municípios vizinhos).
+                  </p>
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-slate-900 hover:bg-slate-800 text-amber-400 font-black px-6 py-3 rounded-xl text-xs transition flex items-center gap-2 shadow-md"
+                >
+                  <Save className="w-4 h-4 text-amber-400" />
+                  <span>Salvar Localização & Raio</span>
+                </button>
+              </form>
+            </div>
+          )}
+
+          {/* ============================================================= */}
+          {/* TAB 3: EDITAR CADASTRO */}
           {/* ============================================================= */}
           {activeTab === 'profile' && (
             <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm">
-              <h3 className="text-lg font-bold text-slate-900 mb-4">
+              <h3 className="text-lg font-black text-slate-900 mb-4">
                 Atualizar Dados do Cadastro
               </h3>
 
               {profileSaved && (
                 <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-xl text-xs font-semibold mb-6 flex items-center gap-2">
                   <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-                  <span>Dados atualizados com sucesso! Já estão visíveis no seu perfil público.</span>
+                  <span>Dados atualizados com sucesso!</span>
                 </div>
               )}
 
               <form onSubmit={handleSaveProfile} className="space-y-5 max-w-2xl">
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Nome Completo / Como quer ser chamado
+                    Nome Completo / Fantasia
                   </label>
                   <input
                     type="text"
@@ -417,231 +652,155 @@ export default function PainelAssinantePage() {
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                      Anos de Experiência na Profissão
-                    </label>
-                    <input
-                      type="number"
-                      required
-                      value={experience}
-                      onChange={(e) => setExperience(Number(e.target.value))}
-                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
+                  {!isStore && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        Anos de Experiência
+                      </label>
+                      <input
+                        type="number"
+                        required
+                        value={experience}
+                        onChange={(e) => setExperience(Number(e.target.value))}
+                        className="w-full bg-slate-50 border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div>
                   <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                    Descrição dos seus Serviços (Biografia)
+                    {isStore ? 'Descrição da Loja' : 'Descrição dos seus Serviços'}
                   </label>
                   <textarea
                     rows={4}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
                     className="w-full bg-slate-50 border border-slate-300 rounded-xl p-3 text-xs focus:outline-none focus:border-amber-500"
-                    placeholder="Conte sobre sua pontualidade, ferramentas que utiliza, tipos de obras que realiza..."
                   />
                 </div>
 
                 <button
                   type="submit"
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-6 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-sm"
+                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-6 py-2.5 rounded-xl text-xs transition flex items-center gap-2 shadow-sm"
                 >
                   <Save className="w-4 h-4" />
-                  <span>Salvar Alterações</span>
+                  <span>Salvar Dados</span>
                 </button>
               </form>
             </div>
           )}
 
           {/* ============================================================= */}
-          {/* ABA 3: PORTFÓLIO / OFERTAS */}
+          {/* TAB 4: PORTFÓLIO DE OBRAS (PRESTADOR) */}
           {/* ============================================================= */}
-          {activeTab === 'portfolio' && (
-            <div className="space-y-8">
-              {!isStore ? (
-                /* GESTÃO DE PORTFÓLIO DE PRESTADOR */
-                <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">
-                      Adicionar Nova Foto de Obra
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Mostre a qualidade do seu trabalho para novos clientes da região
-                    </p>
-                  </div>
+          {activeTab === 'portfolio' && !isStore && (
+            <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
+              <div>
+                <h3 className="text-lg font-black text-slate-900">
+                  Adicionar Foto de Obra Realizada
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Profissionais com portfólio fotográfico recebem até 4x mais contatos no WhatsApp
+                </p>
+              </div>
 
-                  <form onSubmit={handleAddPortfolio} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 max-w-xl">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Título da Obra *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newPortTitle}
-                        onChange={(e) => setNewPortTitle(e.target.value)}
-                        placeholder="Ex: Reforma de Banheiro com Porcelanato"
-                        className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Descrição Breve
-                      </label>
-                      <input
-                        type="text"
-                        value={newPortDesc}
-                        onChange={(e) => setNewPortDesc(e.target.value)}
-                        placeholder="Ex: Alvenaria, nicho embutido e impermeabilização"
-                        className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        URL da Imagem da Obra
-                      </label>
-                      <input
-                        type="url"
-                        required
-                        value={newPortImage}
-                        onChange={(e) => setNewPortImage(e.target.value)}
-                        className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-mono text-[11px]"
-                      />
-                    </div>
-
-                    <button
-                      type="submit"
-                      className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4 text-amber-400" />
-                      <span>Adicionar ao Portfólio</span>
-                    </button>
-                  </form>
-
-                  {/* Lista de Fotos Existentes */}
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 mb-3">
-                      Fotos Atualmente no seu Perfil ({currentProvider.portfolio.length})
-                    </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      {currentProvider.portfolio.map((item) => (
-                        <div
-                          key={item.id}
-                          className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group"
-                        >
-                          <div className="relative h-44 w-full">
-                            <Image
-                              src={item.imageUrl}
-                              alt={item.title}
-                              fill
-                              className="object-cover"
-                            />
-                          </div>
-                          <div className="p-3 flex items-center justify-between">
-                            <span className="font-bold text-xs text-slate-900 truncate">
-                              {item.title}
-                            </span>
-                            <button
-                              onClick={() => deletePortfolioItem(currentProvider.id, item.id)}
-                              className="text-red-500 hover:text-red-700 p-1"
-                              title="Excluir foto"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+              <form onSubmit={handleAddPortfolio} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 max-w-xl">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Título da Obra *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={newPortTitle}
+                    onChange={(e) => setNewPortTitle(e.target.value)}
+                    placeholder="Ex: Reforma de Cozinha e Bancada em Alvenaria"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500"
+                  />
                 </div>
-              ) : (
-                /* GESTÃO DE OFERTAS DA LOJA */
-                <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-sm space-y-6">
-                  <div>
-                    <h3 className="text-lg font-bold text-slate-900">
-                      Cadastrar Promoção da Semana na Loja
-                    </h3>
-                    <p className="text-xs text-slate-500">
-                      Essas ofertas aparecem na Home e na sua vitrine oficial
-                    </p>
-                  </div>
 
-                  <form onSubmit={handleAddOffer} className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4 max-w-xl">
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                        Nome do Produto *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={newOfferName}
-                        onChange={(e) => setNewOfferName(e.target.value)}
-                        placeholder="Ex: Cimento Votoran 50kg"
-                        className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500"
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Descrição Breve
+                  </label>
+                  <input
+                    type="text"
+                    value={newPortDesc}
+                    onChange={(e) => setNewPortDesc(e.target.value)}
+                    placeholder="Ex: Assentamento de porcelanato 84x84 e nicho"
+                    className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    URL da Imagem da Obra
+                  </label>
+                  <input
+                    type="url"
+                    required
+                    value={newPortImage}
+                    onChange={(e) => setNewPortImage(e.target.value)}
+                    className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-mono text-[11px]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-2"
+                >
+                  <Plus className="w-4 h-4 text-amber-400" />
+                  <span>Adicionar ao Portfólio</span>
+                </button>
+              </form>
+
+              {/* Lista */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4">
+                {currentProvider.portfolio.map((item) => (
+                  <div
+                    key={item.id}
+                    className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50 group"
+                  >
+                    <div className="relative h-44 w-full">
+                      <Image
+                        src={item.imageUrl}
+                        alt={item.title}
+                        fill
+                        className="object-cover"
                       />
                     </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                          Preço De Tabela (R$)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={newOfferOrigPrice}
-                          onChange={(e) => setNewOfferOrigPrice(e.target.value)}
-                          className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                          Preço Promocional (R$) *
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          required
-                          value={newOfferPromoPrice}
-                          onChange={(e) => setNewOfferPromoPrice(e.target.value)}
-                          className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2 text-xs focus:outline-none focus:border-amber-500 font-bold text-amber-600"
-                        />
-                      </div>
+                    <div className="p-3 flex items-center justify-between">
+                      <span className="font-bold text-xs text-slate-900 truncate">
+                        {item.title}
+                      </span>
+                      <button
+                        onClick={() => deletePortfolioItem(currentProvider.id, item.id)}
+                        className="text-red-500 hover:text-red-700 p-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
                     </div>
-
-                    <button
-                      type="submit"
-                      className="bg-slate-900 hover:bg-slate-800 text-white font-bold px-5 py-2.5 rounded-xl text-xs transition flex items-center gap-2"
-                    >
-                      <Plus className="w-4 h-4 text-amber-400" />
-                      <span>Publicar Oferta</span>
-                    </button>
-                  </form>
-                </div>
-              )}
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
           {/* ============================================================= */}
-          {/* ABA 4: MINHA ASSINATURA / CHECKOUT PIX E CARTÃO */}
+          {/* TAB 5: CHECKOUT AUTOMATIZADO 100% COM WEBHOOK */}
           {/* ============================================================= */}
           {activeTab === 'subscription' && (
             <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-10 shadow-sm space-y-8">
               <div className="border-b border-slate-100 pb-4">
                 <span className="text-xs font-bold text-amber-600 uppercase tracking-widest">
-                  Faturamento & Assinatura
+                  Checkout 100% Automatizado via Gateway
                 </span>
                 <h3 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
-                  Renovação da Assinatura Mensal
+                  Renovação da Assinatura Mensal (R$ {isStore ? '199,90' : '49,90'})
                 </h3>
                 <p className="text-xs sm:text-sm text-slate-500">
-                  {isStore
-                    ? 'Plano Corporativo para Lojas de Materiais: R$ 249,90/mês'
-                    : 'Plano Profissional Autônomo: R$ 49,90/mês (sem taxa sobre obras)'}
+                  Zero conferência manual: assim que o Pix ou Cartão for pago, a notificação via Webhook libera seu painel na mesma hora!
                 </p>
               </div>
 
@@ -649,20 +808,20 @@ export default function PainelAssinantePage() {
                 <div className="bg-emerald-50 border border-emerald-300 text-emerald-900 p-5 rounded-2xl flex items-center gap-3">
                   <CheckCircle2 className="w-6 h-6 text-emerald-600 shrink-0" />
                   <div>
-                    <h5 className="font-bold text-sm">Pagamento Confirmado com Sucesso!</h5>
+                    <h5 className="font-black text-sm">Webhook Processado com Sucesso!</h5>
                     <p className="text-xs text-emerald-700">
-                      Sua assinatura foi renovada por mais 30 dias. Seu perfil continua no topo das buscas!
+                      Assinatura liberada instantaneamente na tela sem precisar de intervenção manual do administrador.
                     </p>
                   </div>
                 </div>
               )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Opção 1: PIX Copia e Cola & QR Code */}
+                {/* PIX DINÂMICO */}
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4">
                   <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                     <QrCode className="w-5 h-5 text-emerald-600" />
-                    <span>Pagamento Instantâneo via Pix</span>
+                    <span>Pix Dinâmico Instantâneo (QR Code)</span>
                   </div>
 
                   <div className="bg-white p-4 rounded-xl border border-slate-200 text-center space-y-3">
@@ -670,7 +829,7 @@ export default function PainelAssinantePage() {
                       <QrCode className="w-32 h-32 text-white" />
                     </div>
                     <span className="text-xs text-slate-500 block">
-                      Escaneie o QR Code no app do seu banco
+                      Escaneie no aplicativo do seu banco
                     </span>
                   </div>
 
@@ -688,33 +847,48 @@ export default function PainelAssinantePage() {
                       <button
                         onClick={copyPix}
                         className="bg-slate-900 hover:bg-slate-800 text-white p-2.5 rounded-xl shrink-0 transition"
-                        title="Copiar código Pix"
                       >
                         <Copy className="w-4 h-4 text-amber-400" />
                       </button>
                     </div>
                     {copiedPix && (
                       <span className="text-[11px] text-emerald-600 font-bold mt-1 block">
-                        ✓ Código Pix copiado para a área de transferência!
+                        ✓ Copiado para a área de transferência!
                       </span>
                     )}
                   </div>
 
-                  <button
-                    onClick={handleSimulatePayment}
-                    className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md"
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    <span>Simular Confirmação de Pix (+30 Dias)</span>
-                  </button>
+                  {/* BOTÃO DE SIMULAÇÃO DE WEBHOOK AUTOMÁTICO */}
+                  <div className="pt-2">
+                    <button
+                      onClick={handleTriggerWebhookPayment}
+                      disabled={simulatingWebhook}
+                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black py-3 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
+                    >
+                      {simulatingWebhook ? (
+                        <>
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                          <span>Disparando Webhook /api/webhooks/payment...</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>Simular Confirmação Automática de Pix (Webhook)</span>
+                        </>
+                      )}
+                    </button>
+                    <span className="text-[10px] text-slate-400 block text-center mt-1">
+                      Dispara POST na rota do Webhook e libera a tela instantaneamente
+                    </span>
+                  </div>
                 </div>
 
-                {/* Opção 2: Cartão de Crédito */}
+                {/* CARTÃO DE CRÉDITO */}
                 <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-4 flex flex-col justify-between">
                   <div className="space-y-4">
                     <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
                       <CreditCard className="w-5 h-5 text-amber-600" />
-                      <span>Cartão de Crédito (Cobrança Recorrente)</span>
+                      <span>Cartão de Crédito (Recorrência Automática)</span>
                     </div>
 
                     <div className="space-y-3">
@@ -755,11 +929,12 @@ export default function PainelAssinantePage() {
                   </div>
 
                   <button
-                    onClick={handleSimulatePayment}
-                    className="w-full bg-slate-900 hover:bg-slate-800 text-amber-400 font-bold py-3 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md"
+                    onClick={handleTriggerWebhookPayment}
+                    disabled={simulatingWebhook}
+                    className="w-full bg-slate-900 hover:bg-slate-800 text-amber-400 font-black py-3 px-4 rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-md cursor-pointer"
                   >
                     <CreditCard className="w-4 h-4 text-amber-400" />
-                    <span>Pagar com Cartão (R$ {isStore ? '249,90' : '49,90'})</span>
+                    <span>Pagar com Cartão (R$ {isStore ? '199,90' : '49,90'})</span>
                   </button>
                 </div>
               </div>

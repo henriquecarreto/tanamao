@@ -8,15 +8,12 @@ import {
   Search,
   ShieldCheck,
   ShieldAlert,
-  CalendarPlus,
   Ban,
   Trash2,
   Edit,
-  CheckCircle2,
   X,
-  ExternalLink,
+  Compass,
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 
 export default function AdminProfissionaisPage() {
   const {
@@ -32,35 +29,30 @@ export default function AdminProfissionaisPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [editingProvider, setEditingProvider] = useState<ProviderProfile | null>(null);
 
-  // Estados para edição no modal
   const [editName, setEditName] = useState('');
   const [editPhone, setEditPhone] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editRadius, setEditRadius] = useState(35);
 
   const filteredProviders = providers.filter((p) => {
     if (statusFilter !== 'all' && p.subscriptionStatus !== statusFilter) return false;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       const inName = p.fullName.toLowerCase().includes(term);
-      const inCity = p.baseCity.toLowerCase().includes(term);
-      return inName || inCity;
+      const inCity = p.city.toLowerCase().includes(term);
+      const inState = p.state.toLowerCase().includes(term);
+      const inNeighborhood = p.neighborhood.toLowerCase().includes(term);
+      return inName || inCity || inState || inNeighborhood;
     }
     return true;
   });
-
-  const handleAdd30Days = (providerId: string, name: string) => {
-    addProviderDays(providerId, 30);
-    try {
-      confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
-    } catch {}
-    alert(`+30 Dias ativados com sucesso para ${name}!`);
-  };
 
   const handleOpenEdit = (p: ProviderProfile) => {
     setEditingProvider(p);
     setEditName(p.fullName);
     setEditPhone(p.phoneWhatsapp);
     setEditBio(p.bio);
+    setEditRadius(p.serviceRadiusKm);
   };
 
   const handleSaveEdit = (e: React.FormEvent) => {
@@ -70,39 +62,38 @@ export default function AdminProfissionaisPage() {
       fullName: editName,
       phoneWhatsapp: editPhone,
       bio: editBio,
+      serviceRadiusKm: Number(editRadius),
     });
     setEditingProvider(null);
   };
 
   return (
     <div className="space-y-6 max-w-7xl">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
-            <Users className="w-7 h-7 text-amber-500" />
-            Gestão de Profissionais Autônomos
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-1">
-            Controle de assinaturas, ativação manual de 30 dias, verificação e bloqueios
-          </p>
-        </div>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight flex items-center gap-2">
+          <Users className="w-7 h-7 text-amber-500" />
+          Gestão Nacional de Prestadores de Serviços
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 mt-1">
+          Supervisão de autônomos em todos os municípios do Brasil, verificação de idoneidade e moderação
+        </p>
       </div>
 
       {/* FILTROS E BUSCA */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
-        <div className="relative w-full sm:w-80">
+      <div className="bg-white p-4 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div className="relative w-full sm:w-96">
           <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
           <input
             type="text"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Buscar por nome ou cidade..."
+            placeholder="Buscar por nome, bairro, cidade ou UF..."
             className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs focus:outline-none focus:border-amber-500 font-medium"
           />
         </div>
 
         <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto text-xs">
-          <span className="text-slate-400 font-bold shrink-0">Filtrar status:</span>
+          <span className="text-slate-400 font-bold shrink-0">Status:</span>
           {['all', 'active', 'trialing', 'past_due', 'canceled'].map((st) => (
             <button
               key={st}
@@ -118,10 +109,10 @@ export default function AdminProfissionaisPage() {
                 : st === 'active'
                 ? 'Ativos'
                 : st === 'trialing'
-                ? 'Trial 30d'
+                ? '30d Grátis'
                 : st === 'past_due'
                 ? 'Vencidos'
-                : 'Bloqueados'}
+                : 'Suspensos'}
             </button>
           ))}
         </div>
@@ -134,10 +125,10 @@ export default function AdminProfissionaisPage() {
             <thead className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-bold">
               <tr>
                 <th className="py-3.5 px-4">Profissional</th>
-                <th className="py-3.5 px-4">Cidade / Categoria</th>
-                <th className="py-3.5 px-4">Status / Vencimento</th>
+                <th className="py-3.5 px-4">Localização & Raio</th>
+                <th className="py-3.5 px-4">Status da Assinatura</th>
                 <th className="py-3.5 px-4">Métricas</th>
-                <th className="py-3.5 px-4 text-right">Ações Rápidas do Dono</th>
+                <th className="py-3.5 px-4 text-right">Ações Rápidas</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -155,35 +146,30 @@ export default function AdminProfissionaisPage() {
                             {prov.fullName}
                           </span>
                           {prov.isVerified ? (
-                            <span
-                              title="Profissional Verificado"
-                              className="text-amber-500 font-bold"
-                            >
+                            <span title="Profissional Verificado" className="text-amber-500">
                               <ShieldCheck className="w-4 h-4 fill-amber-400 text-slate-900" />
                             </span>
                           ) : (
-                            <span
-                              title="Sem selo"
-                              className="text-slate-300"
-                            >
+                            <span title="Sem selo" className="text-slate-300">
                               <ShieldAlert className="w-4 h-4" />
                             </span>
                           )}
                         </div>
                         <span className="text-[11px] text-slate-400">
-                          WhatsApp: {prov.phoneWhatsapp}
+                          {prov.categories[0]?.name} • WhatsApp: {prov.phoneWhatsapp}
                         </span>
                       </div>
                     </div>
                   </td>
 
-                  {/* Cidade e Categoria */}
+                  {/* Localização e Raio */}
                   <td className="py-3.5 px-4">
-                    <span className="font-semibold text-slate-800 block">
-                      {prov.baseCity} - SP
+                    <span className="font-bold text-slate-800 block">
+                      {prov.neighborhood}, {prov.city} - {prov.state}
                     </span>
-                    <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
-                      {prov.categories[0]?.name || 'Geral'}
+                    <span className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                      <Compass className="w-3 h-3 text-amber-500" />
+                      Raio: {prov.serviceRadiusKm} km
                     </span>
                   </td>
 
@@ -199,10 +185,10 @@ export default function AdminProfissionaisPage() {
                       }`}
                     >
                       {prov.subscriptionStatus === 'active'
-                        ? 'Assinatura Ativa'
+                        ? 'Assinante Ativo'
                         : prov.subscriptionStatus === 'trialing'
-                        ? 'Em Teste Grátis'
-                        : 'Vencido / Bloqueado'}
+                        ? '30 Dias Grátis'
+                        : 'Vencido / Suspenso'}
                     </span>
                     <span className="text-[10px] text-slate-400 block mt-0.5">
                       {prov.currentPeriodEnd
@@ -215,7 +201,7 @@ export default function AdminProfissionaisPage() {
                   <td className="py-3.5 px-4">
                     <div className="space-y-0.5 text-[11px]">
                       <span className="text-emerald-700 font-bold block">
-                        💬 {prov.totalWhatsappClicks} cliques WhatsApp
+                        💬 {prov.totalWhatsappClicks} contatos WhatsApp
                       </span>
                       <span className="text-slate-500 block">
                         👁 {prov.totalViews} visualizações
@@ -226,17 +212,7 @@ export default function AdminProfissionaisPage() {
                   {/* Ações */}
                   <td className="py-3.5 px-4 text-right">
                     <div className="flex items-center justify-end gap-1.5 flex-wrap">
-                      {/* Ativar +30 Dias */}
-                      <button
-                        onClick={() => handleAdd30Days(prov.id, prov.fullName)}
-                        title="Ativar +30 Dias Manualmente (Aprovar Pix direto)"
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold px-2.5 py-1.5 rounded-xl transition flex items-center gap-1"
-                      >
-                        <CalendarPlus className="w-3.5 h-3.5 text-emerald-600" />
-                        <span>+30 Dias</span>
-                      </button>
-
-                      {/* Toggle Selo Verificado */}
+                      {/* Toggle Selo */}
                       <button
                         onClick={() => toggleProviderVerified(prov.id)}
                         title="Alternar Selo de Verificado"
@@ -261,7 +237,7 @@ export default function AdminProfissionaisPage() {
                       {/* Bloquear / Pausar */}
                       <button
                         onClick={() => toggleProviderBlocked(prov.id)}
-                        title={prov.subscriptionStatus === 'canceled' ? 'Desbloquear' : 'Bloquear perfil'}
+                        title={prov.subscriptionStatus === 'canceled' ? 'Desbloquear' : 'Suspender perfil'}
                         className={`p-1.5 rounded-xl border transition ${
                           prov.subscriptionStatus === 'canceled'
                             ? 'bg-red-500 text-white'
@@ -292,7 +268,7 @@ export default function AdminProfissionaisPage() {
         </div>
       </div>
 
-      {/* MODAL DE EDIÇÃO DO PROFISSIONAL */}
+      {/* MODAL DE EDIÇÃO */}
       {editingProvider && (
         <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-200 space-y-4">
@@ -322,22 +298,37 @@ export default function AdminProfissionaisPage() {
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  WhatsApp
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
-                  className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    WhatsApp
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                    Raio de Atendimento (km)
+                  </label>
+                  <input
+                    type="number"
+                    required
+                    value={editRadius}
+                    onChange={(e) => setEditRadius(Number(e.target.value))}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-amber-500"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
-                  Biografia / Descrição
+                  Biografia
                 </label>
                 <textarea
                   rows={4}
@@ -359,7 +350,7 @@ export default function AdminProfissionaisPage() {
                   type="submit"
                   className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold px-5 py-2 rounded-xl text-xs transition"
                 >
-                  Salvar Alterações
+                  Salvar
                 </button>
               </div>
             </form>
