@@ -59,3 +59,11 @@
   - [x] 8.4 Validar `.env.example` com `NEXT_PUBLIC_SITE_URL` e parâmetros do Supabase
   - [x] 8.5 Integrar Supabase Auth no `/login` e `/anuncie` (Clientes -> busca /explorar, Prestadores/Lojas -> painel /painel, Admin atribuído exclusivamente no banco)
   - [x] 8.6 Adequar `/api/checkout` e `/api/webhooks/payment` para responder com HTTP 503 (indisponibilidade) até integração oficial com o gateway
+
+- [x] **Etapa 9: Área Logada & Tela de Login Aprovada**
+  - [x] 9.1 Diagnosticar e resolver causa da perda de CSS no servidor local
+  - [x] 9.2 Adicionar imagem institucional `entrada.jpg` em `public/`
+  - [x] 9.3 Implementar tela de login aprovada na raiz `/` e em `/login` com split layout (formulário + foto entrada.jpg + botão verde)
+  - [x] 9.4 Implementar proteção e redirecionamento de `/explorar` para `/login` quando acessado sem sessão ativa
+  - [x] 9.5 Gerar e incluir patch `tanamao-area-logada.patch`
+  - [x] 9.6 Sincronizar e subir todas as alterações para o GitHub
