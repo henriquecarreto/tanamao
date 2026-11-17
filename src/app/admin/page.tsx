@@ -178,11 +178,10 @@ export default function AdminDashboardPage() {
 
                 <div className="flex items-center gap-2">
                   <span
-                    className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${
-                      prov.subscriptionStatus === 'active'
-                        ? 'bg-emerald-100 text-emerald-800'
-                        : 'bg-amber-100 text-amber-800'
-                    }`}
+                    className={`px-2 py-0.5 rounded-full font-bold text-[10px] ${prov.subscriptionStatus === 'active'
+                      ? 'bg-emerald-100 text-emerald-800'
+                      : 'bg-amber-100 text-amber-800'
+                      }`}
                   >
                     {prov.subscriptionStatus === 'active' ? 'Ativo' : 'Trial 30d'}
                   </span>

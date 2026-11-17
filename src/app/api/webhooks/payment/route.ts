@@ -1,33 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 /**
- * Webhook de Pagamentos Automatizado (Zero intervenção humana)
- * Processa notificações instantâneas de liquidação de Pix e Cartão de Crédito
+ * API Route: /api/webhooks/payment
+ * 
+ * Conforme especificação oficial (README):
+ * "O checkout e o webhook respondem com indisponibilidade até a integração com o gateway de pagamentos."
  */
 export async function POST(req: NextRequest) {
-  try {
-    const body = await req.json();
-    const { transactionId, status, userId, planType } = body;
+  // Verifica se o webhook de produção possui credenciais homologadas
+  const gatewayWebhookSecret = process.env.PAYMENT_WEBHOOK_SECRET || process.env.PAYMENT_GATEWAY_API_KEY;
 
-    if (!transactionId || status !== 'paid') {
-      return NextResponse.json(
-        { success: false, message: 'Transação inválida ou status não aprovado' },
-        { status: 400 }
-      );
-    }
-
-    // Calcula nova data de expiração (+30 dias a partir de agora)
-    const newPeriodEnd = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
-
-    return NextResponse.json({
-      success: true,
-      message: 'Pagamento compensado e assinatura liberada instantaneamente via Webhook!',
-      transactionId,
-      subscriptionStatus: 'active',
-      currentPeriodEnd: newPeriodEnd,
-      processedAt: new Date().toISOString(),
-    });
-  } catch (error) {
-    return NextResponse.json({ success: false, error: 'Erro no processamento do webhook' }, { status: 500 });
+  if (!gatewayWebhookSecret) {
+    return NextResponse.json(
+      {
+        success: false,
+        status: 'unavailable',
+        error: 'Webhook de pagamento temporariamente indisponível.',
+        message: 'O checkout e o webhook respondem com indisponibilidade até a integração com o gateway de pagamentos.',
+      },
+      { status: 503 }
+    );
   }
+
+  // Bloco pronto para recepção e liquidação quando o gateway estiver conectado
+  return NextResponse.json({
+    success: true,
+    message: 'Webhook recebido com sucesso.',
+  });
+}
+
+export async function GET() {
+  return NextResponse.json(
+    {
+      status: 'unavailable',
+      message: 'O checkout e o webhook respondem com indisponibilidade até a integração com o gateway de pagamentos.',
+    },
+    { status: 503 }
+  );
 }

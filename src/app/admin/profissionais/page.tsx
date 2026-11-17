@@ -98,21 +98,20 @@ export default function AdminProfissionaisPage() {
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 rounded-xl font-bold capitalize transition shrink-0 ${
-                statusFilter === st
-                  ? 'bg-slate-900 text-white shadow-sm'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-              }`}
+              className={`px-3 py-1.5 rounded-xl font-bold capitalize transition shrink-0 ${statusFilter === st
+                ? 'bg-slate-900 text-white shadow-sm'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
             >
               {st === 'all'
                 ? 'Todos'
                 : st === 'active'
-                ? 'Ativos'
-                : st === 'trialing'
-                ? '30d Grátis'
-                : st === 'past_due'
-                ? 'Vencidos'
-                : 'Suspensos'}
+                  ? 'Ativos'
+                  : st === 'trialing'
+                    ? '30d Grátis'
+                    : st === 'past_due'
+                      ? 'Vencidos'
+                      : 'Suspensos'}
             </button>
           ))}
         </div>
@@ -176,19 +175,18 @@ export default function AdminProfissionaisPage() {
                   {/* Status */}
                   <td className="py-3.5 px-4">
                     <span
-                      className={`inline-block px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${
-                        prov.subscriptionStatus === 'active'
-                          ? 'bg-emerald-100 text-emerald-800'
-                          : prov.subscriptionStatus === 'trialing'
+                      className={`inline-block px-2.5 py-1 rounded-full font-bold text-[10px] uppercase ${prov.subscriptionStatus === 'active'
+                        ? 'bg-emerald-100 text-emerald-800'
+                        : prov.subscriptionStatus === 'trialing'
                           ? 'bg-amber-100 text-amber-800'
                           : 'bg-red-100 text-red-800'
-                      }`}
+                        }`}
                     >
                       {prov.subscriptionStatus === 'active'
                         ? 'Assinante Ativo'
                         : prov.subscriptionStatus === 'trialing'
-                        ? '30 Dias Grátis'
-                        : 'Vencido / Suspenso'}
+                          ? '30 Dias Grátis'
+                          : 'Vencido / Suspenso'}
                     </span>
                     <span className="text-[10px] text-slate-400 block mt-0.5">
                       {prov.currentPeriodEnd
@@ -216,11 +214,10 @@ export default function AdminProfissionaisPage() {
                       <button
                         onClick={() => toggleProviderVerified(prov.id)}
                         title="Alternar Selo de Verificado"
-                        className={`p-1.5 rounded-xl border transition ${
-                          prov.isVerified
-                            ? 'bg-amber-500 text-slate-950 border-amber-600'
-                            : 'bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-700'
-                        }`}
+                        className={`p-1.5 rounded-xl border transition ${prov.isVerified
+                          ? 'bg-amber-500 text-slate-950 border-amber-600'
+                          : 'bg-slate-100 text-slate-400 border-slate-200 hover:text-slate-700'
+                          }`}
                       >
                         <ShieldCheck className="w-4 h-4" />
                       </button>
@@ -238,11 +235,10 @@ export default function AdminProfissionaisPage() {
                       <button
                         onClick={() => toggleProviderBlocked(prov.id)}
                         title={prov.subscriptionStatus === 'canceled' ? 'Desbloquear' : 'Suspender perfil'}
-                        className={`p-1.5 rounded-xl border transition ${
-                          prov.subscriptionStatus === 'canceled'
-                            ? 'bg-red-500 text-white'
-                            : 'bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 border-slate-200'
-                        }`}
+                        className={`p-1.5 rounded-xl border transition ${prov.subscriptionStatus === 'canceled'
+                          ? 'bg-red-500 text-white'
+                          : 'bg-slate-100 hover:bg-red-50 text-slate-500 hover:text-red-600 border-slate-200'
+                          }`}
                       >
                         <Ban className="w-4 h-4" />
                       </button>

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { useApp } from '@/context/AppContext';
+import { supabase, isSupabaseConfigured } from '@/lib/supabase';
 import {
   Sparkles,
   Check,
@@ -13,6 +14,7 @@ import {
   ArrowRight,
   Gift,
   ShieldCheck,
+  Lock,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -24,12 +26,13 @@ export default function AnunciePage() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [cep, setCep] = useState('');
   const [city, setCity] = useState('Palmital');
   const [category, setCategory] = useState('pedreiro');
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
@@ -39,16 +42,36 @@ export default function AnunciePage() {
         spread: 70,
         origin: { y: 0.6 },
       });
-    } catch {}
+    } catch { }
+
+    const targetRole = selectedPlan.startsWith('store') ? 'store' : 'provider';
+
+    if (isSupabaseConfigured && supabase) {
+      try {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+        await supabase.auth.signUp({
+          email,
+          password: password || 'Tanamao@2026',
+          options: {
+            data: {
+              role: targetRole,
+              full_name: fullName,
+              phone_whatsapp: phone,
+              cep,
+              company_name: fullName,
+            },
+            emailRedirectTo: `${siteUrl}/auth/callback`,
+          },
+        });
+      } catch (err) {
+        console.error('Erro no cadastro Supabase:', err);
+      }
+    }
 
     setTimeout(() => {
-      if (selectedPlan.startsWith('store')) {
-        switchRole('store');
-      } else {
-        switchRole('provider');
-      }
+      switchRole(targetRole);
       router.push('/painel?status=welcome');
-    }, 1200);
+    }, 1000);
   };
 
   return (
@@ -83,11 +106,10 @@ export default function AnunciePage() {
             {/* PLANO AUTÔNOMO */}
             <div
               onClick={() => setSelectedPlan('provider')}
-              className={`rounded-3xl p-7 border-2 transition-all cursor-pointer relative bg-white flex flex-col justify-between ${
-                selectedPlan === 'provider'
-                  ? 'border-amber-500 shadow-2xl ring-4 ring-amber-500/10'
-                  : 'border-slate-200 hover:border-slate-300 shadow-sm'
-              }`}
+              className={`rounded-3xl p-7 border-2 transition-all cursor-pointer relative bg-white flex flex-col justify-between ${selectedPlan === 'provider'
+                ? 'border-amber-500 shadow-2xl ring-4 ring-amber-500/10'
+                : 'border-slate-200 hover:border-slate-300 shadow-sm'
+                }`}
             >
               {selectedPlan === 'provider' && (
                 <span className="absolute -top-3 left-6 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow-md">
@@ -141,11 +163,10 @@ export default function AnunciePage() {
 
               <button
                 type="button"
-                className={`w-full py-3 px-4 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${
-                  selectedPlan === 'provider'
-                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full py-3 px-4 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${selectedPlan === 'provider'
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md'
+                  : 'bg-slate-100 text-slate-700'
+                  }`}
               >
                 <span>Selecionar Autônomo</span>
                 <ArrowRight className="w-4 h-4" />
@@ -155,11 +176,10 @@ export default function AnunciePage() {
             {/* PLANO LOJA REGIONAL */}
             <div
               onClick={() => setSelectedPlan('store_basic')}
-              className={`rounded-3xl p-7 border-2 transition-all cursor-pointer relative bg-white flex flex-col justify-between ${
-                selectedPlan === 'store_basic'
-                  ? 'border-amber-500 shadow-2xl ring-4 ring-amber-500/10'
-                  : 'border-slate-200 hover:border-slate-300 shadow-sm'
-              }`}
+              className={`rounded-3xl p-7 border-2 transition-all cursor-pointer relative bg-white flex flex-col justify-between ${selectedPlan === 'store_basic'
+                ? 'border-amber-500 shadow-2xl ring-4 ring-amber-500/10'
+                : 'border-slate-200 hover:border-slate-300 shadow-sm'
+                }`}
             >
               <div>
                 <div className="flex items-center gap-3 mb-4">
@@ -203,11 +223,10 @@ export default function AnunciePage() {
 
               <button
                 type="button"
-                className={`w-full py-3 px-4 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${
-                  selectedPlan === 'store_basic'
-                    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full py-3 px-4 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${selectedPlan === 'store_basic'
+                  ? 'bg-amber-500 hover:bg-amber-400 text-slate-950 shadow-md'
+                  : 'bg-slate-100 text-slate-700'
+                  }`}
               >
                 <span>Selecionar Loja Regional</span>
                 <ArrowRight className="w-4 h-4" />
@@ -217,11 +236,10 @@ export default function AnunciePage() {
             {/* PLANO LOJA DESTAQUE */}
             <div
               onClick={() => setSelectedPlan('store_featured')}
-              className={`rounded-3xl p-7 border-2 transition-all cursor-pointer relative bg-white flex flex-col justify-between ${
-                selectedPlan === 'store_featured'
-                  ? 'border-amber-500 shadow-2xl ring-4 ring-amber-500/10'
-                  : 'border-slate-200 hover:border-slate-300 shadow-sm'
-              }`}
+              className={`rounded-3xl p-7 border-2 transition-all cursor-pointer relative bg-white flex flex-col justify-between ${selectedPlan === 'store_featured'
+                ? 'border-amber-500 shadow-2xl ring-4 ring-amber-500/10'
+                : 'border-slate-200 hover:border-slate-300 shadow-sm'
+                }`}
             >
               {selectedPlan === 'store_featured' && (
                 <span className="absolute -top-3 left-6 bg-amber-500 text-slate-950 font-black text-[10px] uppercase tracking-wider px-3 py-1 rounded-full shadow-md">
@@ -271,11 +289,10 @@ export default function AnunciePage() {
 
               <button
                 type="button"
-                className={`w-full py-3 px-4 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${
-                  selectedPlan === 'store_featured'
-                    ? 'bg-slate-900 hover:bg-slate-800 text-amber-400 shadow-md'
-                    : 'bg-slate-100 text-slate-700'
-                }`}
+                className={`w-full py-3 px-4 rounded-xl font-bold text-xs transition flex items-center justify-center gap-2 ${selectedPlan === 'store_featured'
+                  ? 'bg-slate-900 hover:bg-slate-800 text-amber-400 shadow-md'
+                  : 'bg-slate-100 text-slate-700'
+                  }`}
               >
                 <span>Selecionar Loja Destaque</span>
                 <ArrowRight className="w-4 h-4" />
@@ -342,6 +359,23 @@ export default function AnunciePage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="seuemail@gmail.com"
                     className="w-full bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-xs font-medium focus:outline-none focus:border-amber-500"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                  Crie sua Senha de Acesso *
+                </label>
+                <div className="relative">
+                  <Lock className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+                  <input
+                    type="password"
+                    required
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full bg-white border border-slate-300 rounded-xl pl-9 pr-4 py-2.5 text-xs font-medium focus:outline-none focus:border-amber-500"
                   />
                 </div>
               </div>

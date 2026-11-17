@@ -51,3 +51,11 @@
   - [x] 7.1 Executar `npm run build` garantindo zero erros de compilação e tipagem estrita
   - [x] 7.2 Testar rotas e fluxos
   - [x] 7.3 Commitar e subir tudo para o GitHub
+
+- [x] **Etapa 8: Alinhamento com Especificação Oficial (README)**
+  - [x] 8.1 Atualizar `README.md` com instruções canônicas de execução e configuração do Supabase
+  - [x] 8.2 Criar migração `supabase/migrations/002_authenticated_product.sql` (trigger `handle_new_user`, RLS, buckets Storage, trava de perfil admin)
+  - [x] 8.3 Criar rota `src/app/auth/callback/route.ts` para tratamento de confirmação de e-mail e redirecionamento por perfil
+  - [x] 8.4 Validar `.env.example` com `NEXT_PUBLIC_SITE_URL` e parâmetros do Supabase
+  - [x] 8.5 Integrar Supabase Auth no `/login` e `/anuncie` (Clientes -> busca /explorar, Prestadores/Lojas -> painel /painel, Admin atribuído exclusivamente no banco)
+  - [x] 8.6 Adequar `/api/checkout` e `/api/webhooks/payment` para responder com HTTP 503 (indisponibilidade) até integração oficial com o gateway

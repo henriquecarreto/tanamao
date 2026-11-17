@@ -29,6 +29,7 @@ import {
   Crosshair,
   Compass,
   Loader2,
+  Info,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
@@ -49,6 +50,9 @@ export default function PainelPage() {
   const [copiedPix, setCopiedPix] = useState(false);
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [simulatingWebhook, setSimulatingWebhook] = useState(false);
+  const [gatewayStatusMessage, setGatewayStatusMessage] = useState<string>(
+    'O checkout e o webhook respondem com indisponibilidade até a integração com o gateway de pagamentos.'
+  );
 
   // Perfil ativo
   const isStore = currentUser?.role === 'store';
@@ -161,12 +165,12 @@ export default function PainelPage() {
     setNewPortDesc('');
   };
 
-  // Simulação de Pagamento Automatizado (Post na rota de Webhook)
+  // Checkout / Webhook (Conforme README: responde com indisponibilidade até gateway integrado)
   const handleTriggerWebhookPayment = async () => {
     setSimulatingWebhook(true);
 
     try {
-      // 1. Chama a rota de checkout para gerar a transação
+      // 1. Chama a rota de checkout para verificar disponibilidade
       const checkRes = await fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -178,7 +182,14 @@ export default function PainelPage() {
       });
       const checkData = await checkRes.json();
 
-      // 2. Dispara a notificação de Webhook do gateway (liberação 100% automatizada)
+      if (checkRes.status === 503 || !checkData.success) {
+        setGatewayStatusMessage(
+          checkData.message || checkData.error || 'O checkout e o webhook respondem com indisponibilidade até a integração com o gateway de pagamentos.'
+        );
+        return;
+      }
+
+      // 2. Dispara a notificação de Webhook do gateway (quando ativo)
       const hookRes = await fetch('/api/webhooks/payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -190,6 +201,13 @@ export default function PainelPage() {
         }),
       });
       const hookData = await hookRes.json();
+
+      if (hookRes.status === 503 || !hookData.success) {
+        setGatewayStatusMessage(
+          hookData.message || hookData.error || 'O checkout e o webhook respondem com indisponibilidade até a integração com o gateway de pagamentos.'
+        );
+        return;
+      }
 
       // 3. Atualiza o estado em memória local instantaneamente (Zero Intervenção Manual)
       await processAutomatedPayment({
@@ -208,8 +226,9 @@ export default function PainelPage() {
           origin: { y: 0.6 },
         });
       } catch {}
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setGatewayStatusMessage('O checkout e o webhook respondem com indisponibilidade até a integração com o gateway de pagamentos.');
     } finally {
       setSimulatingWebhook(false);
     }
@@ -802,6 +821,19 @@ export default function PainelPage() {
                 <p className="text-xs sm:text-sm text-slate-500">
                   Zero conferência manual: assim que o Pix ou Cartão for pago, a notificação via Webhook libera seu painel na mesma hora!
                 </p>
+              </div>
+
+              {/* Status oficial da integração com o Gateway */}
+              <div className="bg-amber-50 border border-amber-300 text-amber-950 p-4 rounded-2xl flex items-start gap-3">
+                <Info className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <h5 className="font-bold text-xs uppercase tracking-wider text-amber-900">
+                    Integração com Gateway de Pagamentos
+                  </h5>
+                  <p className="text-xs text-amber-900/90 font-medium leading-relaxed">
+                    {gatewayStatusMessage}
+                  </p>
+                </div>
               </div>
 
               {paymentSuccess && (
