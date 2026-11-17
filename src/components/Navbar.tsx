@@ -16,10 +16,11 @@ import {
   Menu,
   X,
   Crosshair,
+  LogOut,
 } from 'lucide-react';
 
 export const Navbar: React.FC = () => {
-  const { clientLocation, currentUser, activeRole } = useApp();
+  const { clientLocation, currentUser, activeRole, logout } = useApp();
   const [locationModalOpen, setLocationModalOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const pathname = usePathname();
@@ -110,21 +111,45 @@ export const Navbar: React.FC = () => {
             {/* User / Panel CTA Desktop */}
             <div className="hidden md:flex items-center gap-3">
               {activeRole === 'admin' ? (
-                <Link
-                  href="/admin"
-                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition"
-                >
-                  <ShieldCheck className="w-4 h-4 text-amber-400" />
-                  <span>Painel Admin SaaS</span>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/admin"
+                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-amber-400 border border-amber-500/30 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+                  >
+                    <ShieldCheck className="w-4 h-4 text-amber-400" />
+                    <span>Painel Admin SaaS</span>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      window.location.href = '/login';
+                    }}
+                    title="Encerrar Sessão"
+                    className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
               ) : currentUser ? (
-                <Link
-                  href="/painel"
-                  className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition"
-                >
-                  <User className="w-4 h-4 text-amber-400" />
-                  <span>Meu Painel</span>
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href="/painel"
+                    className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 px-3.5 py-2 rounded-xl text-xs font-bold transition"
+                  >
+                    <User className="w-4 h-4 text-amber-400" />
+                    <span>Meu Painel</span>
+                  </Link>
+                  <button
+                    onClick={() => {
+                      logout();
+                      window.location.href = '/login';
+                    }}
+                    title="Encerrar Sessão"
+                    className="p-2 rounded-xl text-slate-400 hover:text-red-400 hover:bg-slate-800 transition"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </div>
               ) : (
                 <Link
                   href="/login"

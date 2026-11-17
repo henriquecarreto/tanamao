@@ -59,13 +59,16 @@ interface AppContextType {
   activeRole: 'customer' | 'provider' | 'store' | 'admin';
   switchRole: (role: 'customer' | 'provider' | 'store' | 'admin') => void;
   getProviderDistanceAndTier: (provider: ProviderProfile) => ProximityInfo;
+  isLoadingSession: boolean;
+  logout: () => void;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [clientLocation, setClientLocationState] = useState<ClientLocation>(DEFAULT_LOCATION);
-  const [currentUser, setCurrentUser] = useState<Profile | null>(DEMO_ADMIN_USER);
+  const [currentUser, setCurrentUser] = useState<Profile | null>(null);
+  const [isLoadingSession, setIsLoadingSession] = useState<boolean>(true);
   const [providers, setProviders] = useState<ProviderProfile[]>(DEMO_PROVIDERS);
   const [stores, setStores] = useState<StoreProfile[]>(DEMO_STORES);
   const [payments, setPayments] = useState<SubscriptionPayment[]>(DEMO_PAYMENTS);
@@ -87,9 +90,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (savedPayments) setPayments(JSON.parse(savedPayments));
 
       const savedUser = localStorage.getItem('tnm_user_v2');
-      if (savedUser) setCurrentUser(JSON.parse(savedUser));
+      if (savedUser) {
+        setCurrentUser(JSON.parse(savedUser));
+      } else {
+        setCurrentUser(null);
+      }
     } catch {
-      // Ignora erro de storage
+      setCurrentUser(null);
+    } finally {
+      setIsLoadingSession(false);
     }
   }, []);
 
@@ -404,6 +413,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } catch {}
   };
 
+  const logout = () => {
+    setCurrentUser(null);
+    try {
+      localStorage.removeItem('tnm_user_v2');
+    } catch {}
+  };
+
   const activeRole: 'customer' | 'provider' | 'store' | 'admin' =
     currentUser?.role || 'customer';
 
@@ -436,6 +452,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeRole,
         switchRole,
         getProviderDistanceAndTier,
+        isLoadingSession,
+        logout,
       }}
     >
       {children}

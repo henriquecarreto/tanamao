@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Navbar } from '@/components/Navbar';
 import { Footer } from '@/components/Footer';
 import { ProviderCard } from '@/components/ProviderCard';
@@ -18,8 +18,25 @@ import {
 } from 'lucide-react';
 
 function ExplorarContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
-  const { providers, stores, categories, clientLocation, getProviderDistanceAndTier, detectGpsLocation } = useApp();
+  const {
+    providers,
+    stores,
+    categories,
+    clientLocation,
+    getProviderDistanceAndTier,
+    detectGpsLocation,
+    currentUser,
+    isLoadingSession,
+  } = useApp();
+
+  // Proteção da Área Logada: se não tiver sessão, redireciona para /login
+  useEffect(() => {
+    if (!isLoadingSession && !currentUser) {
+      router.push('/login');
+    }
+  }, [currentUser, isLoadingSession, router]);
 
   const [keyword, setKeyword] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('todas');
@@ -34,6 +51,18 @@ function ExplorarContent() {
     const cat = searchParams.get('cat');
     if (cat) setSelectedCategory(cat);
   }, [searchParams]);
+
+  if (isLoadingSession) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-slate-500 font-bold text-xs animate-pulse">Carregando área logada...</div>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return null;
+  }
 
   // Filtragem e classificação geolocalizada em cascata
   const filteredProviders = useMemo(() => {

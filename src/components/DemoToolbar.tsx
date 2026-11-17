@@ -3,10 +3,17 @@
 import React from 'react';
 import { useApp } from '@/context/AppContext';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { ShieldCheck, HardHat, Building2, UserCheck, ArrowRight, Sparkles } from 'lucide-react';
 
 export const DemoToolbar: React.FC = () => {
   const { activeRole, switchRole } = useApp();
+  const pathname = usePathname();
+
+  // Mantém a tela de login 100% limpa com o layout aprovado
+  if (pathname === '/' || pathname === '/login') {
+    return null;
+  }
 
   return (
     <div className="bg-slate-900 border-b border-amber-500/30 text-xs text-slate-200 py-1.5 px-4 sticky top-0 z-50 shadow-md">
