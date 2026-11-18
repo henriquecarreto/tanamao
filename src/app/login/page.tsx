@@ -112,22 +112,45 @@ function LoginContent() {
           handleAuthRedirect(role);
         }
       } else {
-        // Modo local com validação
+        // Modo local com contas pré-configuradas e validação
+        if (!loginPassword || loginPassword.length < 3) {
+          throw new Error('A senha deve conter pelo menos 3 caracteres.');
+        }
+
         let role: 'customer' | 'provider' | 'store' | 'admin' = 'customer';
+        let matchedId = `usr-${Date.now()}`;
+        let matchedName = loginEmail.split('@')[0];
+
         if (loginEmail.toLowerCase().includes('admin')) {
           role = 'admin';
-        } else if (loginEmail.toLowerCase().includes('loja') || loginEmail.toLowerCase().includes('empresa')) {
+          matchedId = 'usr-admin-01';
+          matchedName = 'Administrador Mestre';
+        } else if (
+          loginEmail.toLowerCase().includes('loja') ||
+          loginEmail.toLowerCase().includes('empresa') ||
+          loginEmail.toLowerCase().includes('construvale')
+        ) {
           role = 'store';
-        } else if (loginEmail.toLowerCase().includes('prestador') || loginEmail.toLowerCase().includes('pedreiro')) {
+          matchedId = 'usr-store-01';
+          matchedName = 'ConstruVale Materiais para Construção';
+        } else if (
+          loginEmail.toLowerCase().includes('prestador') ||
+          loginEmail.toLowerCase().includes('pedreiro') ||
+          loginEmail.toLowerCase().includes('carlos') ||
+          loginEmail.toLowerCase().includes('marcos') ||
+          loginEmail.toLowerCase().includes('eletricista')
+        ) {
           role = 'provider';
+          matchedId = 'usr-prov-01';
+          matchedName = 'Carlos Eduardo Santos (Mestre de Obras)';
         }
 
         const userObj = {
-          id: `usr-${Date.now()}`,
+          id: matchedId,
           role,
-          fullName: loginEmail.split('@')[0],
+          fullName: matchedName,
           email: loginEmail,
-          phoneWhatsapp: '',
+          phoneWhatsapp: role === 'provider' ? '18997112233' : '18997000000',
           isBlocked: false,
           createdAt: new Date().toISOString(),
         };

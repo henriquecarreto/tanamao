@@ -221,3 +221,11 @@ FOR INSERT WITH CHECK (
 -- SET role = 'admin'
 -- WHERE email = 'admin@tanamao.com.br';
 -- =====================================================================
+
+-- =====================================================================
+-- 5. CONTA PRÉ-CONFIGURADA DE PRESTADOR PARA TESTES
+-- =====================================================================
+-- E-mail: prestador@tanamao.com.br
+-- Senha:  123456
+-- Papel:  provider (acesso automático ao /painel com 30 dias grátis)
+-- =====================================================================
